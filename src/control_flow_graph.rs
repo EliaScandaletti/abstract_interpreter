@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::syntax::{AExp, BExp, Stm, Variable};
+use crate::syntax::{AExp, BExp, Id, Stm, Variable};
 
 pub type Label = u32;
 
@@ -15,6 +15,7 @@ pub enum Command {
 
 struct ProgramBuilder {
     labels: BTreeSet<Label>,
+    pos_map: BTreeMap<Label, Id>,
     entry_point: Option<Label>,
     exit_point: Option<Label>,
     arcs: BTreeMap<(Label, Label), Command>,
@@ -25,11 +26,17 @@ impl ProgramBuilder {
     fn new(next_label: Label) -> Self {
         Self {
             labels: BTreeSet::new(),
+            pos_map: BTreeMap::new(),
             entry_point: None,
             exit_point: None,
             arcs: BTreeMap::new(),
             next_label,
         }
+    }
+
+    fn label_pos(&mut self, l: Label, pos: Id) -> &mut Self {
+        self.pos_map.insert(l, pos);
+        self
     }
 
     fn add_arc(&mut self, from: Label, com: Command, to: Label) -> &mut Self {
@@ -50,6 +57,7 @@ impl ProgramBuilder {
         sub.rename_label(sub.exit_point, exit_point);
 
         self.labels.extend(&sub.labels);
+        self.pos_map.extend(&sub.label_to_id);
         self.arcs.extend(sub.arcs);
         self
     }
@@ -67,6 +75,7 @@ impl ProgramBuilder {
     fn finalize(&self) -> Program {
         Program {
             labels: self.labels.clone(),
+            label_to_id: self.pos_map.clone(),
             entry_point: self.entry_point.unwrap(),
             exit_point: self.exit_point.unwrap(),
             arcs: self.arcs.clone(),
@@ -77,14 +86,19 @@ impl ProgramBuilder {
 #[derive(Debug, Clone)]
 pub struct Program {
     labels: BTreeSet<Label>,
+    label_to_id: BTreeMap<Label, Id>,
     entry_point: Label,
     exit_point: Label,
     arcs: BTreeMap<(Label, Label), Command>,
 }
 
 impl Program {
-    pub fn labels(&self) -> BTreeSet<Label> {
-        self.labels.clone()
+    pub fn labels(&self) -> &BTreeSet<Label> {
+        &self.labels
+    }
+
+    pub fn label_to_id(&self) -> &BTreeMap<Label, Id> {
+        &self.label_to_id
     }
 
     pub fn entry_point(&self) -> Label {
@@ -95,8 +109,8 @@ impl Program {
         self.exit_point
     }
 
-    pub fn arcs(&self) -> BTreeMap<(Label, Label), Command> {
-        self.arcs.clone()
+    pub fn arcs(&self) -> &BTreeMap<(Label, Label), Command> {
+        &self.arcs
     }
 
     fn refresh_labels(&mut self, min: Label) -> Label {
@@ -110,8 +124,17 @@ impl Program {
                 l + min
             })
             .collect();
+
+        self.label_to_id = self
+            .label_to_id
+            .clone()
+            .into_iter()
+            .map(|(l, id)| (l + min, id))
+            .collect();
+
         self.entry_point += min;
         self.exit_point += min;
+
         self.arcs = self
             .clone()
             .arcs
@@ -127,6 +150,13 @@ impl Program {
             .labels
             .into_iter()
             .map(|l| if l == from { to } else { l })
+            .collect();
+
+        self.label_to_id = self
+            .clone()
+            .label_to_id
+            .into_iter()
+            .map(|(l, id)| if l == from { (to, id) } else { (l, id) })
             .collect();
 
         if self.entry_point == from {
@@ -168,8 +198,17 @@ impl Program {
             .into_iter()
             .map(|l| *map.get(&l).unwrap())
             .collect();
+
+        self.label_to_id = self
+            .clone()
+            .label_to_id
+            .into_iter()
+            .map(|(l, id)| (*map.get(&l).unwrap(), id))
+            .collect();
+
         self.entry_point = *map.get(&self.entry_point).unwrap();
         self.exit_point = *map.get(&self.exit_point).unwrap();
+
         self.arcs = self
             .clone()
             .arcs
@@ -181,39 +220,42 @@ impl Program {
 
     pub fn new(ast: Stm) -> Self {
         match ast {
-            Stm::AExp(_) | Stm::BExp(_) | Stm::Ass(_, _) | Stm::Skip => {
+            Stm::AExp(id, _) | Stm::BExp(id, _) | Stm::Ass(id, _, _) | Stm::Skip(id) => {
                 let comm = match ast {
-                    Stm::AExp(aexp) => Command::AExp(aexp),
-                    Stm::BExp(bexp) => Command::BExp(bexp),
-                    Stm::Ass(var, val) => Command::Ass(var, val),
-                    Stm::Skip => Command::Skip,
+                    Stm::AExp(_, aexp) => Command::AExp(aexp),
+                    Stm::BExp(_, bexp) => Command::BExp(bexp),
+                    Stm::Ass(_, var, val) => Command::Ass(var, val),
+                    Stm::Skip(_) => Command::Skip,
                     _ => unreachable!(),
                 };
                 ProgramBuilder::new(2)
                     .set_entry(0)
                     .set_exit(1)
                     .add_arc(0, comm, 1)
+                    .label_pos(0, id)
                     .finalize()
             }
 
-            Stm::IfThenElse(g, ast1, ast2) => ProgramBuilder::new(4)
+            Stm::IfThenElse(id, g, ast1, ast2) => ProgramBuilder::new(4)
                 .set_entry(0)
                 .set_exit(3)
                 .add_arc(0, Command::Guard(g.clone()), 1)
                 .add_arc(0, Command::Guard(BExp::not(g.into())), 2)
                 .add_subgraph(1, Self::new(*ast1), 3)
                 .add_subgraph(2, Self::new(*ast2), 3)
+                .label_pos(0, id)
                 .finalize(),
 
-            Stm::While(g, stm) => ProgramBuilder::new(3)
+            Stm::While(id, g, stm) => ProgramBuilder::new(3)
                 .set_entry(0)
                 .set_exit(2)
                 .add_arc(0, Command::Guard(g.clone()), 1)
                 .add_subgraph(1, Self::new(*stm), 0)
                 .add_arc(0, Command::Guard(BExp::not(g.into())), 2)
+                .label_pos(0, id)
                 .finalize(),
 
-            Stm::Comp(stm1, stm2) => ProgramBuilder::new(3)
+            Stm::Comp(_, stm1, stm2) => ProgramBuilder::new(3)
                 .set_entry(0)
                 .set_exit(2)
                 .add_subgraph(0, Self::new(*stm1), 1)

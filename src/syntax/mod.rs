@@ -47,6 +47,16 @@ pub type Numeral = i32;
 
 pub type Variable = String;
 
+pub type Id = usize;
+fn get_id() -> Id {
+    static mut ID: Id = 1;
+    unsafe {
+        let ret = ID;
+        ID += 1;
+        ret
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AExp {
     Num(Numeral),
@@ -85,13 +95,13 @@ impl BExp {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Stm {
-    AExp(AExp),
-    BExp(BExp),
-    Ass(Variable, AExp),
-    Skip,
-    IfThenElse(BExp, Box<Stm>, Box<Stm>),
-    While(BExp, Box<Stm>),
-    Comp(Box<Stm>, Box<Stm>),
+    AExp(Id, AExp),
+    BExp(Id, BExp),
+    Ass(Id, Variable, AExp),
+    Skip(Id),
+    IfThenElse(Id, BExp, Box<Stm>, Box<Stm>),
+    While(Id, BExp, Box<Stm>),
+    Comp(Id, Box<Stm>, Box<Stm>),
 }
 
 fn aexp_ast(pairs: Pairs<Rule>) -> AExp {
@@ -170,41 +180,46 @@ fn bexp_ast(pairs: Pairs<Rule>) -> BExp {
 
 fn stm_ast(pairs: Pairs<Rule>) -> Stm {
     STM_PARSER
-        .map_primary(|pair| match pair.as_rule() {
-            Rule::stm => stm_ast(pair.into_inner()),
-            Rule::aexp => Stm::AExp(aexp_ast(pair.into_inner())),
-            Rule::bexp => Stm::BExp(bexp_ast(pair.into_inner())),
-            Rule::skip => Stm::Skip,
-            Rule::ass => {
-                let mut it = pair.into_inner();
-                let var = it.next().unwrap();
-                let exp = it.next().unwrap();
-                Stm::Ass(var.as_str().into(), aexp_ast(exp.into_inner()))
+        .map_primary(|pair| {
+            let id = get_id();
+            match pair.as_rule() {
+                Rule::stm => stm_ast(pair.into_inner()),
+                Rule::aexp => Stm::AExp(id, aexp_ast(pair.into_inner())),
+                Rule::bexp => Stm::BExp(id, bexp_ast(pair.into_inner())),
+                Rule::skip => Stm::Skip(id),
+                Rule::ass => {
+                    let mut it = pair.into_inner();
+                    let var = it.next().unwrap();
+                    let exp = it.next().unwrap();
+                    Stm::Ass(id, var.as_str().into(), aexp_ast(exp.into_inner()))
+                }
+                Rule::ifelse => {
+                    let mut it = pair.into_inner();
+                    let cond = it.next().unwrap();
+                    let if_ = it.next().unwrap();
+                    let else_ = it.next().unwrap();
+                    Stm::IfThenElse(
+                        id,
+                        bexp_ast(cond.into_inner()),
+                        stm_ast(if_.into_inner()).into(),
+                        stm_ast(else_.into_inner()).into(),
+                    )
+                }
+                Rule::whiledo => {
+                    let mut it = pair.into_inner();
+                    let cond = it.next().unwrap();
+                    let body = it.next().unwrap();
+                    Stm::While(
+                        id,
+                        bexp_ast(cond.into_inner()),
+                        stm_ast(body.into_inner()).into(),
+                    )
+                }
+                _ => unreachable!("{:?}", pair),
             }
-            Rule::ifelse => {
-                let mut it = pair.into_inner();
-                let cond = it.next().unwrap();
-                let if_ = it.next().unwrap();
-                let else_ = it.next().unwrap();
-                Stm::IfThenElse(
-                    bexp_ast(cond.into_inner()),
-                    stm_ast(if_.into_inner()).into(),
-                    stm_ast(else_.into_inner()).into(),
-                )
-            }
-            Rule::whiledo => {
-                let mut it = pair.into_inner();
-                let cond = it.next().unwrap();
-                let body = it.next().unwrap();
-                Stm::While(
-                    bexp_ast(cond.into_inner()),
-                    stm_ast(body.into_inner()).into(),
-                )
-            }
-            _ => unreachable!("{:?}", pair),
         })
         .map_infix(|lhs, op, rhs| match op.as_rule() {
-            Rule::comp => Stm::Comp(lhs.into(), rhs.into()),
+            Rule::comp => Stm::Comp(0, lhs.into(), rhs.into()),
             _ => unreachable!(),
         })
         .parse(pairs)
@@ -253,19 +268,19 @@ fn fmt(stm: &Stm, i: usize) -> String {
     let x = "";
     let ii = i + 4;
     match stm {
-        Stm::AExp(aexp) => format!("{x:i$}{aexp}"),
-        Stm::BExp(bexp) => format!("{x:i$}{bexp}"),
-        Stm::Ass(var, aexp) => format!("{x:i$}{var} := {aexp}"),
-        Stm::Skip => format!("{x:i$}skip"),
-        Stm::IfThenElse(g, stm1, stm2) => {
+        Stm::AExp(_, aexp) => format!("{x:i$}{aexp}"),
+        Stm::BExp(_, bexp) => format!("{x:i$}{bexp}"),
+        Stm::Ass(_, var, aexp) => format!("{x:i$}{var} := {aexp}"),
+        Stm::Skip(_) => format!("{x:i$}skip"),
+        Stm::IfThenElse(_, g, stm1, stm2) => {
             format!(
                 "{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
-                fmt(&*stm1, ii),
-                fmt(&*stm2, ii)
+                fmt(&stm1, ii),
+                fmt(&stm2, ii)
             )
         }
-        Stm::While(g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&*stm, ii)),
-        Stm::Comp(stm1, stm2) => format!("{};\n{}", fmt(&*stm1, i), fmt(&*stm2, i)),
+        Stm::While(_, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
+        Stm::Comp(_, stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
     }
 }
 
