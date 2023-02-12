@@ -11,7 +11,6 @@ extern crate pest_derive;
 
 mod abstraction;
 mod control_flow_graph;
-mod math;
 pub mod syntax;
 
 fn main() {
