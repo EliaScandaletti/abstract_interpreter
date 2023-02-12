@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fmt::Display, fs};
 
 use abstraction::{AIResult, AbsDomain};
+use colored::Colorize;
 use control_flow_graph::ControlFlowGraph;
 use syntax::{build_ast, Stm};
 
@@ -24,15 +25,15 @@ fn main() {
     println!("\nParsed input:\n{}", prog);
     let graph = ControlFlowGraph::new(&prog);
     let inv = IntervalInterpreter::<-50, 2000>::execute(graph);
-    println!("\n{:-<30}", "Output:");
-    print_result(&prog, &inv);
+    println!("\n{:-<30}", "Output:".blue());
+    println!("{}", pretty_result(&prog, &inv))
 }
 
-fn print_result<S>(prog: &Stm, inv: &AIResult<S>)
+fn pretty_result<S>(prog: &Stm, inv: &AIResult<S>) -> String
 where
     S: AbsDomain + Display,
 {
-    fn get_inv<'a, S>(stm: &Stm, inv: &'a BTreeMap<Id, S>) -> Option<&'a S>
+    fn get_inv<'a, S>(stm: &Stm, inv: &'a BTreeMap<Id, S>) -> (Id, Option<&'a S>)
     where
         S: AbsDomain + Display,
     {
@@ -45,7 +46,7 @@ where
             Stm::While(id, _, _) => id,
             Stm::Comp(id, _, _) => id,
         };
-        inv.get(id)
+        (*id, inv.get(id))
     }
 
     fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Id, S>, i: usize) -> String
@@ -54,24 +55,26 @@ where
     {
         let x = "";
         let ii = i + 4;
-        let s = get_inv(stm, inv);
+        let (id, s) = get_inv(stm, inv);
+        let ss = match s {
+            Some(s) => format!("{id}: {s}").purple(),
+            None => "".into(),
+        };
         match stm {
-            Stm::AExp(_, aexp) => format!("[{}]\n{x:i$}{aexp}", s.unwrap()),
-            Stm::BExp(_, bexp) => format!("[{}]\n{x:i$}{bexp}", s.unwrap()),
-            Stm::Ass(_, var, aexp) => format!("[{}]\n{x:i$}{var} := {aexp}", s.unwrap()),
-            Stm::Skip(_) => format!("[{}]\n{x:i$}skip", s.unwrap()),
+            Stm::AExp(_, aexp) => format!("{ss}\n{x:i$}{aexp}"),
+            Stm::BExp(_, bexp) => format!("{ss}\n{x:i$}{bexp}"),
+            Stm::Ass(_, var, aexp) => format!("{ss}\n{x:i$}{var} := {aexp}"),
+            Stm::Skip(_) => format!("{ss}\n{x:i$}skip"),
             Stm::IfThenElse(_, g, stm1, stm2) => {
                 format!(
-                    "[{}]\n{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
-                    s.unwrap(),
+                    "{ss}\n{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
                     print_nice(&stm1, inv, ii),
                     print_nice(&stm2, inv, ii),
                 )
             }
             Stm::While(_, g, stm) => {
                 format!(
-                    "[{}]\n{x:i$}while {g} do\n{}\n{x:i$}done",
-                    s.unwrap(),
+                    "{ss}\n{x:i$}while {g} do\n{}\n{x:i$}done",
                     print_nice(&stm, inv, ii),
                 )
             }
@@ -85,5 +88,6 @@ where
         }
     }
 
-    println!("{}", print_nice(prog, &inv.inv, 16))
+    let body = print_nice(prog, &inv.inv, 8);
+    format!("{body}\n{}", inv.last_inv.to_string().purple())
 }

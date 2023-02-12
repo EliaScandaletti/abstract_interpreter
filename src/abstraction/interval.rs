@@ -326,7 +326,13 @@ impl<const LB: i32, const UB: i32> Display for Interval<LB, UB> {
                 (Limit::InfN, Limit::InfP) => write!(f, "integer"),
                 (Limit::InfN, Limit::Num(ub)) => write!(f, "<= {ub}"),
                 (Limit::Num(lb), Limit::InfP) => write!(f, ">= {lb}"),
-                (Limit::Num(lb), Limit::Num(ub)) => write!(f, "in [{lb}; {ub}]"),
+                (Limit::Num(lb), Limit::Num(ub)) => {
+                    if *lb == *ub {
+                        write!(f, "= {lb}")
+                    } else {
+                        write!(f, "in [{lb}; {ub}]")
+                    }
+                }
             },
         }
     }
