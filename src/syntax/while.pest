@@ -1,0 +1,51 @@
+
+keywords = _{ "true" | "false" | "skip" | "if" | "then" | "else" | "endif" | "while" | "do" | "done" }
+
+num = @{ ASCII_DIGIT+ }
+
+var = @{ !keywords ~ ASCII_ALPHA+ }
+
+aexp = { apre* ~ aval ~ (ainfix ~ apre* ~ aval )* }
+  aval = _{ num | pre_inc | pre_dec | post_inc | post_dec | var | "(" ~ aexp ~ ")"}
+    pre_inc = { "++" ~ var }
+    pre_dec = { "--" ~ var }
+    post_inc = { var ~ "++" }
+    post_dec = { var ~ "--" }
+  ainfix = _{ add | sub | mul | div }
+    add = { "+" }
+    sub = { "-" }
+    mul = { "*" }
+    div = { "/" }
+  apre = _{ neg }
+    neg = { "-" }
+
+bexp = { bpre* ~ bval ~ (binfix ~ bpre* ~ bval )* }
+  bval = _{ tt | ff | "(" ~ bexp ~ ")" | eq | neq | le }
+    tt = { "true" }
+    ff = { "false" }
+    eq = { aexp ~ "=" ~ aexp }
+    neq = { aexp ~ "!=" ~ aexp }
+    le = { aexp ~ "<" ~ aexp }
+  binfix = _{ and | or }
+    and = { "&&" }
+    or = { "||" }
+  bpre = _{ not }
+    not = { "!" }
+
+stm = { sval ~ (sinfix ~ sval)* }
+  sval = _{ skip | ifelse | whiledo | ass | bexp | aexp}
+    skip =  { "skip" }
+    ass =  { var ~ ":=" ~ aexp }
+    ifelse =  { "if" ~ bexp ~ "then" ~ stm ~ "else" ~ stm ~ "endif" }
+    whiledo =  { "while" ~ bexp ~ "do" ~ stm ~ "done" }
+  sinfix = _{ comp }
+    comp = { ";" }
+  
+program = _{SOI ~ stm ~ EOI}
+
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{
+      "//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE
+    | "/*" ~ (!"*/" ~ ANY)* ~ "*/"
+}
