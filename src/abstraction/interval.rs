@@ -1,4 +1,7 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::{
+    fmt::Display,
+    ops::{Add, Div, Mul, Neg, Sub},
+};
 
 use crate::syntax::Numeral;
 
@@ -310,6 +313,21 @@ impl<const LB: Numeral, const UB: Numeral> Div for Interval<LB, UB> {
                     )
                 }
             }
+        }
+    }
+}
+
+impl<const LB: i32, const UB: i32> Display for Interval<LB, UB> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Interval::Bot => write!(f, "dead_code"),
+            Interval::Int { lb, ub } => match (lb, ub) {
+                (Limit::InfP, _) | (_, Limit::InfN) => unreachable!(),
+                (Limit::InfN, Limit::InfP) => write!(f, "integer"),
+                (Limit::InfN, Limit::Num(ub)) => write!(f, "<= {ub}"),
+                (Limit::Num(lb), Limit::InfP) => write!(f, ">= {lb}"),
+                (Limit::Num(lb), Limit::Num(ub)) => write!(f, "in [{lb}; {ub}]"),
+            },
         }
     }
 }

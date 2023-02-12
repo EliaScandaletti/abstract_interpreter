@@ -13,7 +13,7 @@ pub enum Command {
     Skip,
 }
 
-struct ProgramBuilder {
+struct GraphBuilder {
     labels: BTreeSet<Label>,
     pos_map: BTreeMap<Label, Id>,
     entry_point: Option<Label>,
@@ -22,7 +22,7 @@ struct ProgramBuilder {
     next_label: Label,
 }
 
-impl ProgramBuilder {
+impl GraphBuilder {
     fn new(next_label: Label) -> Self {
         Self {
             labels: BTreeSet::new(),
@@ -49,7 +49,7 @@ impl ProgramBuilder {
     fn add_subgraph(
         &mut self,
         entry_point: Label,
-        mut sub: Program,
+        mut sub: ControlFlowGraph,
         exit_point: Label,
     ) -> &mut Self {
         self.next_label = sub.refresh_labels(self.next_label);
@@ -72,8 +72,8 @@ impl ProgramBuilder {
         self
     }
 
-    fn finalize(&self) -> Program {
-        Program {
+    fn finalize(&self) -> ControlFlowGraph {
+        ControlFlowGraph {
             labels: self.labels.clone(),
             label_to_id: self.pos_map.clone(),
             entry_point: self.entry_point.unwrap(),
@@ -84,7 +84,7 @@ impl ProgramBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct Program {
+pub struct ControlFlowGraph {
     labels: BTreeSet<Label>,
     label_to_id: BTreeMap<Label, Id>,
     entry_point: Label,
@@ -92,7 +92,7 @@ pub struct Program {
     arcs: BTreeMap<(Label, Label), Command>,
 }
 
-impl Program {
+impl ControlFlowGraph {
     pub fn labels(&self) -> &BTreeSet<Label> {
         &self.labels
     }
@@ -218,48 +218,48 @@ impl Program {
         self
     }
 
-    pub fn new(ast: Stm) -> Self {
+    pub fn new(ast: &Stm) -> Self {
         match ast {
             Stm::AExp(id, _) | Stm::BExp(id, _) | Stm::Ass(id, _, _) | Stm::Skip(id) => {
                 let comm = match ast {
-                    Stm::AExp(_, aexp) => Command::AExp(aexp),
-                    Stm::BExp(_, bexp) => Command::BExp(bexp),
-                    Stm::Ass(_, var, val) => Command::Ass(var, val),
+                    Stm::AExp(_, aexp) => Command::AExp(aexp.clone()),
+                    Stm::BExp(_, bexp) => Command::BExp(bexp.clone()),
+                    Stm::Ass(_, var, val) => Command::Ass(var.clone(), val.clone()),
                     Stm::Skip(_) => Command::Skip,
                     _ => unreachable!(),
                 };
-                ProgramBuilder::new(2)
+                GraphBuilder::new(2)
                     .set_entry(0)
                     .set_exit(1)
                     .add_arc(0, comm, 1)
-                    .label_pos(0, id)
+                    .label_pos(0, *id)
                     .finalize()
             }
 
-            Stm::IfThenElse(id, g, ast1, ast2) => ProgramBuilder::new(4)
+            Stm::IfThenElse(id, g, ast1, ast2) => GraphBuilder::new(4)
                 .set_entry(0)
                 .set_exit(3)
                 .add_arc(0, Command::Guard(g.clone()), 1)
-                .add_arc(0, Command::Guard(BExp::not(g.into())), 2)
-                .add_subgraph(1, Self::new(*ast1), 3)
-                .add_subgraph(2, Self::new(*ast2), 3)
-                .label_pos(0, id)
+                .add_arc(0, Command::Guard(BExp::not(g.clone())), 2)
+                .add_subgraph(1, Self::new(&*ast1), 3)
+                .add_subgraph(2, Self::new(&*ast2), 3)
+                .label_pos(0, *id)
                 .finalize(),
 
-            Stm::While(id, g, stm) => ProgramBuilder::new(3)
+            Stm::While(id, g, stm) => GraphBuilder::new(3)
                 .set_entry(0)
                 .set_exit(2)
                 .add_arc(0, Command::Guard(g.clone()), 1)
-                .add_subgraph(1, Self::new(*stm), 0)
-                .add_arc(0, Command::Guard(BExp::not(g.into())), 2)
-                .label_pos(0, id)
+                .add_subgraph(1, Self::new(&*stm), 0)
+                .add_arc(0, Command::Guard(BExp::not(g.clone())), 2)
+                .label_pos(0, *id)
                 .finalize(),
 
-            Stm::Comp(_, stm1, stm2) => ProgramBuilder::new(3)
+            Stm::Comp(_, stm1, stm2) => GraphBuilder::new(3)
                 .set_entry(0)
                 .set_exit(2)
-                .add_subgraph(0, Self::new(*stm1), 1)
-                .add_subgraph(1, Self::new(*stm2), 2)
+                .add_subgraph(0, Self::new(&*stm1), 1)
+                .add_subgraph(1, Self::new(&*stm2), 2)
                 .finalize(),
         }
         .prettify()

@@ -8,8 +8,8 @@ use std::{
 };
 
 use crate::{
-    control_flow_graph::{Command, Label, Program},
-    syntax::{AExp, BExp, Variable},
+    control_flow_graph::{Command, ControlFlowGraph, Label},
+    syntax::{AExp, BExp, Id, Variable},
 };
 
 pub trait AbsValue:
@@ -47,9 +47,17 @@ pub trait AbsDomain: PartialEq {
     // fn alpha<T>(val: T) -> Self;
 }
 
+#[derive(Debug)]
+pub struct AIResult<S>
+where
+    S: AbsDomain,
+{
+    pub inv: BTreeMap<Id, S>,
+    pub last_inv: S,
+}
+
 pub trait AbstractInterpreter<S>
 where
-    S: std::fmt::Debug,
     S: AbsDomain + Clone,
 {
     fn aexp(state: &mut S, exp: &AExp) -> S::Value;
@@ -76,10 +84,11 @@ where
         }
     }
 
-    fn execute(prg: Program) -> BTreeMap<Label, S> {
-        let arcs = prg.arcs();
-        let labels = prg.labels();
-        let entry_point = prg.entry_point();
+    fn execute(graph: ControlFlowGraph) -> AIResult<S> {
+        let arcs = graph.arcs();
+        let labels = graph.labels();
+        let entry_point = graph.entry_point();
+        let exit_point = graph.exit_point();
 
         let fwd_dep: BTreeMap<Label, Vec<Label>> = labels
             .iter()
@@ -126,6 +135,14 @@ where
             }
         }
 
-        invariants
+        let map = graph.label_to_id();
+        let last_inv = invariants.get(&exit_point).unwrap().clone();
+        let inv = invariants
+            .into_iter()
+            .filter(|(l, _)| *l != exit_point)
+            .map(|(l, s)| (*map.get(&l).unwrap(), s))
+            .collect();
+
+        AIResult { inv, last_inv }
     }
 }

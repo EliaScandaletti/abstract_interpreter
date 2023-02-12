@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::syntax::Variable;
 
@@ -84,6 +84,33 @@ where
                     .collect();
 
                 Vars(v)
+            }
+        }
+    }
+}
+
+impl<Value> Display for NonRelationalDomain<Value>
+where
+    Value: AbsValue + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NonRelationalDomain::Bot => write!(f, "dead code"),
+            NonRelationalDomain::Vars(vars) => {
+                if vars.is_empty() {
+                    write!(f, "any value")?;
+                }
+                {
+                    let mut vars = vars.iter();
+                    if let Some((var, val)) = vars.next() {
+                        write!(f, "{var} {val}")?;
+
+                        for (var, val) in vars {
+                            write!(f, ", {var} {val}")?;
+                        }
+                    };
+                }
+                Ok(())
             }
         }
     }
