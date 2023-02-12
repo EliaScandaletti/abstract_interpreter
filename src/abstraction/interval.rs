@@ -106,6 +106,11 @@ impl<const LB: Numeral, const UB: Numeral> From<Numeral> for Interval<LB, UB> {
 
 impl<const LB: Numeral, const UB: Numeral> From<(Limit, Limit)> for Interval<LB, UB> {
     fn from((mut lb, mut ub): (Limit, Limit)) -> Self {
+        if lb == ub {
+            if let Limit::Num(_) = lb {
+                return Self::Int { lb, ub };
+            }
+        }
         if lb < Limit::Num(LB) {
             lb = Limit::InfN
         }
