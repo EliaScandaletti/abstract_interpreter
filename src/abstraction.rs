@@ -57,8 +57,7 @@ where
     fn bexp(state: &mut S, exp: &BExp) -> S;
 
     fn evaluate(mut state: S, comm: &Command) -> S {
-        let old = state.clone();
-        let s = match comm {
+        match comm {
             Command::AExp(aexp) => {
                 Self::aexp(&mut state, &aexp);
                 state
@@ -74,9 +73,7 @@ where
             }
             Command::Skip => state,
             Command::Guard(guard) => Self::bexp(&mut state, guard),
-        };
-        println!("{:#?} {:?} {:#?}", old, comm, s);
-        s
+        }
     }
 
     fn execute(prg: Program) -> BTreeMap<Label, S> {
@@ -116,7 +113,6 @@ where
             let new = bwd_dep.get(&n).unwrap().iter().fold(S::top(), |s, p| {
                 let ps = invariants.get(p).unwrap();
                 let comm = arcs.get(&(*p, n)).unwrap();
-                print!("\n{p} - {n}");
                 let ns = Self::evaluate(ps.clone(), comm);
                 S::lub(&s, &ns)
             });
