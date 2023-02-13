@@ -194,7 +194,7 @@
             every node/.style={fill=white,circle}]
             \path [->] (A) edge[bend right=30] node {\textit{b}} (B);
             \path [->] (A) edge node {\textit{!b}} (C);
-            \path [->] (B) edge[bend right=30] node {\textit{stm1}} (A);
+            \path [->] (B) edge[bend right=30] node {\textit{stm}} (A);
         \end{scope}
     \end{tikzpicture}
 
@@ -233,8 +233,9 @@
 
     \begin{multline*}
         \textrm{Int}_{m,n} = \{ \emptyset, \mathbb{Z} \}
+        \cup \{ [a, b], [a, b] \subseteq [m, n] \}
         \cup \{ [k, k], k \in \mathbb{Z} \} \\
-        \cup \{ (-\inf, k], k \in [m, n] \} \\
+        \cup \{ (-\inf, k], k \in [m, n] \}
         \cup \{ [k, +\inf), k \in [m, n] \}
     \end{multline*}
 
@@ -303,7 +304,7 @@
 
     Arithmetic expressions comparison can always be transformed in a comparison between an arithmetic expression and $0$.
 
-    In particular: $\textit{a1} \diamond \textit{a2} \iff \textit{a1} - \textit{a2} \diamond [0, 0]$.
+    In particular: $\textit{a1} \diamond \textit{a2} \iff (\textit{a1} - \textit{a2}) \diamond 0$.
 
     ~\\
     The comparison is now performed in three steps:
@@ -412,9 +413,9 @@
 
 \end{frame}
 
-% \begin{frame}
-%     \centering \huge
-%     \emph{Thank you for your attention!}
-% \end{frame}
+\begin{frame}
+    \centering \huge
+    \emph{Thank you for your attention!}
+\end{frame}
 
 \end{document}
