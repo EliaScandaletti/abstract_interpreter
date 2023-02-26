@@ -93,29 +93,23 @@ impl Mul for Limit {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Interval<const LB: Numeral, const UB: Numeral> {
+pub enum Interval {
     Bot,
     Int { lb: Limit, ub: Limit },
 }
 
-impl<const LB: Numeral, const UB: Numeral> From<Numeral> for Interval<LB, UB> {
+impl From<Numeral> for Interval {
     fn from(value: Numeral) -> Self {
         (Limit::Num(value), Limit::Num(value)).into()
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> From<(Limit, Limit)> for Interval<LB, UB> {
-    fn from((mut lb, mut ub): (Limit, Limit)) -> Self {
+impl From<(Limit, Limit)> for Interval {
+    fn from((lb, ub): (Limit, Limit)) -> Self {
         if lb == ub {
             if let Limit::Num(_) = lb {
                 return Self::Int { lb, ub };
             }
-        }
-        if lb < Limit::Num(LB) {
-            lb = Limit::InfN
-        }
-        if ub > Limit::Num(UB) {
-            ub = Limit::InfP
         }
         if lb <= ub {
             Self::Int { lb, ub }
@@ -125,7 +119,7 @@ impl<const LB: Numeral, const UB: Numeral> From<(Limit, Limit)> for Interval<LB,
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> PartialOrd for Interval<LB, UB> {
+impl PartialOrd for Interval {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use std::cmp::Ordering::*;
         use Interval::*;
@@ -146,7 +140,7 @@ impl<const LB: Numeral, const UB: Numeral> PartialOrd for Interval<LB, UB> {
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> AbsValue for Interval<LB, UB> {
+impl AbsValue for Interval {
     fn bot() -> Self {
         Interval::Bot
     }
@@ -186,7 +180,7 @@ impl<const LB: Numeral, const UB: Numeral> AbsValue for Interval<LB, UB> {
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> Neg for Interval<LB, UB> {
+impl Neg for Interval {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -198,7 +192,7 @@ impl<const LB: Numeral, const UB: Numeral> Neg for Interval<LB, UB> {
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> Add for Interval<LB, UB> {
+impl Add for Interval {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -210,7 +204,7 @@ impl<const LB: Numeral, const UB: Numeral> Add for Interval<LB, UB> {
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> Sub for Interval<LB, UB> {
+impl Sub for Interval {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -218,7 +212,7 @@ impl<const LB: Numeral, const UB: Numeral> Sub for Interval<LB, UB> {
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> Mul for Interval<LB, UB> {
+impl Mul for Interval {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -234,7 +228,7 @@ impl<const LB: Numeral, const UB: Numeral> Mul for Interval<LB, UB> {
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> Div for Interval<LB, UB> {
+impl Div for Interval {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
@@ -322,7 +316,7 @@ impl<const LB: Numeral, const UB: Numeral> Div for Interval<LB, UB> {
     }
 }
 
-impl<const LB: i32, const UB: i32> Display for Interval<LB, UB> {
+impl Display for Interval {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Interval::Bot => write!(f, "dead_code"),

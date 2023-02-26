@@ -24,7 +24,7 @@ fn main() {
     let prog = build_ast(&input);
     println!("\nParsed input:\n{}", prog);
     let graph = ControlFlowGraph::new(&prog);
-    let inv = IntervalInterpreter::<-50, 2000>::execute(graph);
+    let inv = IntervalInterpreter::execute(graph);
     println!("\n{:-<30}", "Output:".blue());
     println!("{}", pretty_result(&prog, &inv))
 }

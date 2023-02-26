@@ -1,6 +1,6 @@
 use crate::{
     abstraction::AbsValue,
-    syntax::{AExp, BExp, Numeral, Variable},
+    syntax::{AExp, BExp, Variable},
 };
 
 use super::{
@@ -9,26 +9,26 @@ use super::{
     AbsDomain, AbstractInterpreter,
 };
 
-pub struct IntervalInterpreter<const LB: Numeral, const UB: Numeral> {}
+pub struct IntervalInterpreter {}
 
-type IntervalDomain<const LB: Numeral, const UB: Numeral> = NonRelationalDomain<Interval<LB, UB>>;
+type IntervalDomain = NonRelationalDomain<Interval>;
 
-enum IntervalExpTree<const LB: Numeral, const UB: Numeral> {
-    Num(Interval<LB, UB>),
-    Var(Variable, Interval<LB, UB>),
-    Add(Box<Self>, Box<Self>, Interval<LB, UB>),
-    Sub(Box<Self>, Box<Self>, Interval<LB, UB>),
-    Mul(Box<Self>, Box<Self>, Interval<LB, UB>),
-    Div(Box<Self>, Box<Self>, Interval<LB, UB>),
-    Neg(Box<Self>, Interval<LB, UB>),
-    PreInc(Variable, Interval<LB, UB>),
-    PreDec(Variable, Interval<LB, UB>),
-    PostInc(Variable, Interval<LB, UB>),
-    PostDec(Variable, Interval<LB, UB>),
+enum IntervalExpTree {
+    Num(Interval),
+    Var(Variable, Interval),
+    Add(Box<Self>, Box<Self>, Interval),
+    Sub(Box<Self>, Box<Self>, Interval),
+    Mul(Box<Self>, Box<Self>, Interval),
+    Div(Box<Self>, Box<Self>, Interval),
+    Neg(Box<Self>, Interval),
+    PreInc(Variable, Interval),
+    PreDec(Variable, Interval),
+    PostInc(Variable, Interval),
+    PostDec(Variable, Interval),
 }
 
-impl<const LB: Numeral, const UB: Numeral> IntervalExpTree<LB, UB> {
-    fn build(state: &mut IntervalDomain<LB, UB>, exp: &AExp) -> Self {
+impl IntervalExpTree {
+    fn build(state: &mut IntervalDomain, exp: &AExp) -> Self {
         use IntervalExpTree::*;
         match exp {
             AExp::Num(n) => Num((Limit::Num(*n), Limit::Num(*n)).into()),
@@ -84,7 +84,7 @@ impl<const LB: Numeral, const UB: Numeral> IntervalExpTree<LB, UB> {
         }
     }
 
-    fn evaluate(&mut self, state: &mut IntervalDomain<LB, UB>) -> Interval<LB, UB> {
+    fn evaluate(&mut self, state: &mut IntervalDomain) -> Interval {
         use IntervalExpTree::*;
         match self {
             Num(i) => *i,
@@ -149,7 +149,7 @@ impl<const LB: Numeral, const UB: Numeral> IntervalExpTree<LB, UB> {
         }
     }
 
-    fn get_interval(&self) -> Interval<LB, UB> {
+    fn get_interval(&self) -> Interval {
         use IntervalExpTree::*;
         match self {
             Num(i) => *i,
@@ -166,7 +166,7 @@ impl<const LB: Numeral, const UB: Numeral> IntervalExpTree<LB, UB> {
         }
     }
 
-    fn force(&mut self, state: &mut IntervalDomain<LB, UB>, int: Interval<LB, UB>) {
+    fn force(&mut self, state: &mut IntervalDomain, int: Interval) {
         use IntervalExpTree::*;
         match self {
             Num(i) => {
@@ -236,10 +236,8 @@ impl<const LB: Numeral, const UB: Numeral> IntervalExpTree<LB, UB> {
     }
 }
 
-impl<const LB: Numeral, const UB: Numeral> AbstractInterpreter<IntervalDomain<LB, UB>>
-    for IntervalInterpreter<LB, UB>
-{
-    fn aexp(state: &mut IntervalDomain<LB, UB>, exp: &AExp) -> Interval<LB, UB> {
+impl AbstractInterpreter<IntervalDomain> for IntervalInterpreter {
+    fn aexp(state: &mut IntervalDomain, exp: &AExp) -> Interval {
         match exp {
             AExp::Num(n) => Interval::Int {
                 lb: Limit::Num(*n),
@@ -316,7 +314,7 @@ impl<const LB: Numeral, const UB: Numeral> AbstractInterpreter<IntervalDomain<LB
         }
     }
 
-    fn bexp(state: &mut IntervalDomain<LB, UB>, exp: &BExp) -> IntervalDomain<LB, UB> {
+    fn bexp(state: &mut IntervalDomain, exp: &BExp) -> IntervalDomain {
         use BExp::*;
         match exp {
             True => state.clone(),
