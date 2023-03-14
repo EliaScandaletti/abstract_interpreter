@@ -61,12 +61,13 @@ where
     let AIResult { inv, exit_point } = inv;
     let last_inv = inv.get(exit_point).unwrap();
 
-    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Label, S>) -> (Label, Option<S>)
+    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Label, S>) -> (Label, bool, S)
     where
         S: Clone + Display,
     {
         let id = stm.id();
-        (*id, inv.get(id).cloned())
+        let w = stm.is_widen();
+        (*id, w, inv.get(id).unwrap().clone())
     }
 
     fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Label, S>, i: usize) -> String
@@ -75,11 +76,8 @@ where
     {
         let x = "";
         let ii = i + 4;
-        let (id, s) = get_inv(stm, inv);
-        let ss = match s {
-            Some(s) => format!("{id}: {s}").purple(),
-            None => "".into(),
-        };
+        let (id, w, s) = get_inv(stm, inv);
+        let ss = format!("{id}{}: {s}", if w { "w" } else { " " }).purple();
         match stm {
             Stm::AExp(_, _, aexp) => format!("{ss}\n{x:i$}{aexp}"),
             Stm::BExp(_, _, bexp) => format!("{ss}\n{x:i$}{bexp}"),
@@ -98,7 +96,7 @@ where
                     print_nice(&stm, inv, ii),
                 )
             }
-            Stm::Comp(_, stm1, stm2) => {
+            Stm::Comp(stm1, stm2) => {
                 format!(
                     "{};\n{}",
                     print_nice(&stm1, inv, i),
@@ -112,6 +110,6 @@ where
     let body = print_nice(prog, inv, i);
     format!(
         "{body}\n{}",
-        format!("{exit_point}: {last_inv}").purple().purple()
+        format!("{exit_point} : {last_inv}").purple().purple()
     )
 }

@@ -180,7 +180,7 @@ pub enum Stm {
     Skip(Label, bool),
     IfThenElse(Label, bool, BExp, Box<Stm>, Box<Stm>),
     While(Label, bool, BExp, Box<Stm>),
-    Comp(bool, Box<Stm>, Box<Stm>),
+    Comp(Box<Stm>, Box<Stm>),
 }
 
 impl Stm {
@@ -192,7 +192,19 @@ impl Stm {
             | Stm::Skip(id, _)
             | Stm::IfThenElse(id, _, _, _, _)
             | Stm::While(id, _, _, _) => id,
-            Stm::Comp(_, s1, _) => s1.id(),
+            Stm::Comp(s1, _) => s1.id(),
+        }
+    }
+
+    pub fn is_widen(&self) -> bool {
+        match self {
+            Stm::AExp(_, w, _)
+            | Stm::BExp(_, w, _)
+            | Stm::Ass(_, w, _, _)
+            | Stm::Skip(_, w)
+            | Stm::IfThenElse(_, w, _, _, _)
+            | Stm::While(_, w, _, _) => *w,
+            Stm::Comp(s1, _) => s1.is_widen(),
         }
     }
 
@@ -217,7 +229,7 @@ impl Stm {
                 let it2 = s.get_vars().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, s1, s2) => {
+            Stm::Comp(s1, s2) => {
                 let it1 = s1.get_vars().into_iter();
                 let it2 = s2.get_vars().into_iter();
                 it1.chain(it2).collect()
@@ -241,7 +253,7 @@ impl Stm {
                 let it2 = s.get_numerals().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, s1, s2) => {
+            Stm::Comp(s1, s2) => {
                 let it1 = s1.get_numerals().into_iter();
                 let it2 = s2.get_numerals().into_iter();
                 it1.chain(it2).collect()
@@ -367,20 +379,25 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
             }
         })
         .map_infix(|lhs, op, rhs| match op.as_rule() {
-            Rule::comp => Stm::Comp(false, lhs.into(), rhs.into()),
+            Rule::comp => Stm::Comp(lhs.into(), rhs.into()),
             _ => unreachable!(),
         })
-        .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::wid => match rhs {
-                Stm::AExp(id, _, e) => Stm::AExp(id, true, e),
-                Stm::BExp(id, _, e) => Stm::BExp(id, true, e),
-                Stm::Ass(id, _, x, e) => Stm::Ass(id, true, x, e),
-                Stm::Skip(id, _) => Stm::Skip(id, true),
-                Stm::IfThenElse(id, _, g, e1, e2) => Stm::IfThenElse(id, true, g, e1, e2),
-                Stm::While(id, _, g, e) => Stm::While(id, true, g, e),
-                Stm::Comp(_, s1, s2) => Stm::Comp(true, s1, s2),
-            },
-            _ => unreachable!(),
+        .map_prefix(|op, rhs| {
+            fn make_wid(stm: Stm) -> Stm {
+                match stm {
+                    Stm::AExp(id, _, e) => Stm::AExp(id, true, e),
+                    Stm::BExp(id, _, e) => Stm::BExp(id, true, e),
+                    Stm::Ass(id, _, x, e) => Stm::Ass(id, true, x, e),
+                    Stm::Skip(id, _) => Stm::Skip(id, true),
+                    Stm::IfThenElse(id, _, g, e1, e2) => Stm::IfThenElse(id, true, g, e1, e2),
+                    Stm::While(id, _, g, e) => Stm::While(id, true, g, e),
+                    Stm::Comp(s1, s2) => Stm::Comp(make_wid(*s1).into(), s2),
+                }
+            }
+            match op.as_rule() {
+                Rule::wid => make_wid(rhs),
+                _ => unreachable!(),
+            }
         })
         .parse(pairs)
 }
@@ -440,7 +457,7 @@ fn fmt(stm: &Stm, i: usize) -> String {
             )
         }
         Stm::While(_, _, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
-        Stm::Comp(_, stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
+        Stm::Comp(stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
     }
 }
 

@@ -151,7 +151,7 @@ impl ControlFlowGraph {
                 }
             }
 
-            Stm::Comp(_, stm1, stm2) => {
+            Stm::Comp(stm1, stm2) => {
                 let g1 = Self::new(&stm1);
                 let g2 = Self::new(&stm2);
 
