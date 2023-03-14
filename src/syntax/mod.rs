@@ -40,6 +40,7 @@ lazy_static::lazy_static! {
         // Precedence is defined lowest to highest
         PrattParser::new()
         .op(Op::infix(comp, Left))
+        .op(Op::prefix(wid))
     };
 }
 
@@ -95,13 +96,13 @@ impl BExp {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Stm {
-    AExp(Id, AExp),
-    BExp(Id, BExp),
-    Ass(Id, Variable, AExp),
-    Skip(Id),
-    IfThenElse(Id, BExp, Box<Stm>, Box<Stm>),
-    While(Id, BExp, Box<Stm>),
-    Comp(Id, Box<Stm>, Box<Stm>),
+    AExp(Id, bool, AExp),
+    BExp(Id, bool, BExp),
+    Ass(Id, bool, Variable, AExp),
+    Skip(Id, bool),
+    IfThenElse(Id, bool, BExp, Box<Stm>, Box<Stm>),
+    While(Id, bool, BExp, Box<Stm>),
+    Comp(Id, bool, Box<Stm>, Box<Stm>),
 }
 
 fn aexp_vars(e: &AExp) -> BTreeSet<Variable> {
@@ -177,26 +178,26 @@ fn bexp_numerals(e: &BExp) -> BTreeSet<Numeral> {
 impl Stm {
     pub fn get_vars(&self) -> BTreeSet<Variable> {
         match self {
-            Stm::AExp(_, e) => aexp_vars(e),
-            Stm::BExp(_, e) => bexp_vars(e),
-            Stm::Ass(_, x, e) => {
+            Stm::AExp(_, _, e) => aexp_vars(e),
+            Stm::BExp(_, _, e) => bexp_vars(e),
+            Stm::Ass(_, _, x, e) => {
                 let mut ret = aexp_vars(e);
                 ret.insert(x.clone());
                 ret
             }
-            Stm::Skip(_) => BTreeSet::new(),
-            Stm::IfThenElse(_, g, s1, s2) => {
+            Stm::Skip(_, _) => BTreeSet::new(),
+            Stm::IfThenElse(_, _, g, s1, s2) => {
                 let it1 = bexp_vars(g).into_iter();
                 let it2 = s1.get_vars().into_iter();
                 let it3 = s2.get_vars().into_iter();
                 it1.chain(it2).chain(it3).collect()
             }
-            Stm::While(_, g, s) => {
+            Stm::While(_, _, g, s) => {
                 let it1 = bexp_vars(g).into_iter();
                 let it2 = s.get_vars().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, s1, s2) => {
+            Stm::Comp(_, _, s1, s2) => {
                 let it1 = s1.get_vars().into_iter();
                 let it2 = s2.get_vars().into_iter();
                 it1.chain(it2).collect()
@@ -206,21 +207,21 @@ impl Stm {
 
     pub fn get_numerals(&self) -> BTreeSet<Numeral> {
         match self {
-            Stm::AExp(_, e) | Stm::Ass(_, _, e) => aexp_numerals(e),
-            Stm::BExp(_, e) => bexp_numerals(e),
-            Stm::Skip(_) => BTreeSet::new(),
-            Stm::IfThenElse(_, g, s1, s2) => {
+            Stm::AExp(_, _, e) | Stm::Ass(_, _, _, e) => aexp_numerals(e),
+            Stm::BExp(_, _, e) => bexp_numerals(e),
+            Stm::Skip(_, _) => BTreeSet::new(),
+            Stm::IfThenElse(_, _, g, s1, s2) => {
                 let it1 = bexp_numerals(g).into_iter();
                 let it2 = s1.get_numerals().into_iter();
                 let it3 = s2.get_numerals().into_iter();
                 it1.chain(it2).chain(it3).collect()
             }
-            Stm::While(_, g, s) => {
+            Stm::While(_, _, g, s) => {
                 let it1 = bexp_numerals(g).into_iter();
                 let it2 = s.get_numerals().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, s1, s2) => {
+            Stm::Comp(_, _, s1, s2) => {
                 let it1 = s1.get_numerals().into_iter();
                 let it2 = s2.get_numerals().into_iter();
                 it1.chain(it2).collect()
@@ -309,14 +310,14 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
             let id = get_id();
             match pair.as_rule() {
                 Rule::stm => stm_ast(pair.into_inner()),
-                Rule::aexp => Stm::AExp(id, aexp_ast(pair.into_inner())),
-                Rule::bexp => Stm::BExp(id, bexp_ast(pair.into_inner())),
-                Rule::skip => Stm::Skip(id),
+                Rule::aexp => Stm::AExp(id, false, aexp_ast(pair.into_inner())),
+                Rule::bexp => Stm::BExp(id, false, bexp_ast(pair.into_inner())),
+                Rule::skip => Stm::Skip(id, false),
                 Rule::ass => {
                     let mut it = pair.into_inner();
                     let var = it.next().unwrap();
                     let exp = it.next().unwrap();
-                    Stm::Ass(id, var.as_str().into(), aexp_ast(exp.into_inner()))
+                    Stm::Ass(id, false, var.as_str().into(), aexp_ast(exp.into_inner()))
                 }
                 Rule::ifelse => {
                     let mut it = pair.into_inner();
@@ -325,6 +326,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                     let else_ = it.next().unwrap();
                     Stm::IfThenElse(
                         id,
+                        false,
                         bexp_ast(cond.into_inner()),
                         stm_ast(if_.into_inner()).into(),
                         stm_ast(else_.into_inner()).into(),
@@ -336,6 +338,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                     let body = it.next().unwrap();
                     Stm::While(
                         id,
+                        false,
                         bexp_ast(cond.into_inner()),
                         stm_ast(body.into_inner()).into(),
                     )
@@ -344,7 +347,19 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
             }
         })
         .map_infix(|lhs, op, rhs| match op.as_rule() {
-            Rule::comp => Stm::Comp(0, lhs.into(), rhs.into()),
+            Rule::comp => Stm::Comp(0, false, lhs.into(), rhs.into()),
+            _ => unreachable!(),
+        })
+        .map_prefix(|op, rhs| match op.as_rule() {
+            Rule::wid => match rhs {
+                Stm::AExp(id, _, e) => Stm::AExp(id, true, e),
+                Stm::BExp(id, _, e) => Stm::BExp(id, true, e),
+                Stm::Ass(id, _, x, e) => Stm::Ass(id, true, x, e),
+                Stm::Skip(id, _) => Stm::Skip(id, true),
+                Stm::IfThenElse(id, _, g, e1, e2) => Stm::IfThenElse(id, true, g, e1, e2),
+                Stm::While(id, _, g, e) => Stm::While(id, true, g, e),
+                Stm::Comp(id, _, s1, s2) => Stm::Comp(id, true, s1, s2),
+            },
             _ => unreachable!(),
         })
         .parse(pairs)
@@ -393,19 +408,19 @@ fn fmt(stm: &Stm, i: usize) -> String {
     let x = "";
     let ii = i + 4;
     match stm {
-        Stm::AExp(_, aexp) => format!("{x:i$}{aexp}"),
-        Stm::BExp(_, bexp) => format!("{x:i$}{bexp}"),
-        Stm::Ass(_, var, aexp) => format!("{x:i$}{var} := {aexp}"),
-        Stm::Skip(_) => format!("{x:i$}skip"),
-        Stm::IfThenElse(_, g, stm1, stm2) => {
+        Stm::AExp(_, _, aexp) => format!("{x:i$}{aexp}"),
+        Stm::BExp(_, _, bexp) => format!("{x:i$}{bexp}"),
+        Stm::Ass(_, _, var, aexp) => format!("{x:i$}{var} := {aexp}"),
+        Stm::Skip(_, _) => format!("{x:i$}skip"),
+        Stm::IfThenElse(_, _, g, stm1, stm2) => {
             format!(
                 "{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
                 fmt(&stm1, ii),
                 fmt(&stm2, ii)
             )
         }
-        Stm::While(_, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
-        Stm::Comp(_, stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
+        Stm::While(_, _, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
+        Stm::Comp(_, _, stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
     }
 }
 

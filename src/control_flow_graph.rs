@@ -220,12 +220,15 @@ impl ControlFlowGraph {
 
     pub fn new(ast: &Stm) -> Self {
         match ast {
-            Stm::AExp(id, _) | Stm::BExp(id, _) | Stm::Ass(id, _, _) | Stm::Skip(id) => {
+            Stm::AExp(id, _, _)
+            | Stm::BExp(id, _, _)
+            | Stm::Ass(id, _, _, _)
+            | Stm::Skip(id, _) => {
                 let comm = match ast {
-                    Stm::AExp(_, aexp) => Command::AExp(aexp.clone()),
-                    Stm::BExp(_, bexp) => Command::BExp(bexp.clone()),
-                    Stm::Ass(_, var, val) => Command::Ass(var.clone(), val.clone()),
-                    Stm::Skip(_) => Command::Skip,
+                    Stm::AExp(_, _, aexp) => Command::AExp(aexp.clone()),
+                    Stm::BExp(_, _, bexp) => Command::BExp(bexp.clone()),
+                    Stm::Ass(_, _, var, val) => Command::Ass(var.clone(), val.clone()),
+                    Stm::Skip(_, _) => Command::Skip,
                     _ => unreachable!(),
                 };
                 GraphBuilder::new(2)
@@ -236,7 +239,7 @@ impl ControlFlowGraph {
                     .finalize()
             }
 
-            Stm::IfThenElse(id, g, ast1, ast2) => GraphBuilder::new(4)
+            Stm::IfThenElse(id, _, g, ast1, ast2) => GraphBuilder::new(4)
                 .set_entry(0)
                 .set_exit(3)
                 .add_arc(0, Command::Guard(g.clone()), 1)
@@ -246,7 +249,7 @@ impl ControlFlowGraph {
                 .label_pos(0, *id)
                 .finalize(),
 
-            Stm::While(id, g, stm) => GraphBuilder::new(3)
+            Stm::While(id, _, g, stm) => GraphBuilder::new(3)
                 .set_entry(0)
                 .set_exit(2)
                 .add_arc(0, Command::Guard(g.clone()), 1)
@@ -255,7 +258,7 @@ impl ControlFlowGraph {
                 .label_pos(0, *id)
                 .finalize(),
 
-            Stm::Comp(_, stm1, stm2) => GraphBuilder::new(3)
+            Stm::Comp(_, _, stm1, stm2) => GraphBuilder::new(3)
                 .set_entry(0)
                 .set_exit(2)
                 .add_subgraph(0, Self::new(&*stm1), 1)

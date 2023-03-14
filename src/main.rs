@@ -63,13 +63,13 @@ where
         S: Clone + Display,
     {
         let id = match stm {
-            Stm::AExp(id, _) => id,
-            Stm::BExp(id, _) => id,
-            Stm::Ass(id, _, _) => id,
-            Stm::Skip(id) => id,
-            Stm::IfThenElse(id, _, _, _) => id,
-            Stm::While(id, _, _) => id,
-            Stm::Comp(id, _, _) => id,
+            Stm::AExp(id, _, _) => id,
+            Stm::BExp(id, _, _) => id,
+            Stm::Ass(id, _, _, _) => id,
+            Stm::Skip(id, _) => id,
+            Stm::IfThenElse(id, _, _, _, _) => id,
+            Stm::While(id, _, _, _) => id,
+            Stm::Comp(id, _, _, _) => id,
         };
         (*id, inv.get(id).cloned())
     }
@@ -86,24 +86,24 @@ where
             None => "".into(),
         };
         match stm {
-            Stm::AExp(_, aexp) => format!("{ss}\n{x:i$}{aexp}"),
-            Stm::BExp(_, bexp) => format!("{ss}\n{x:i$}{bexp}"),
-            Stm::Ass(_, var, aexp) => format!("{ss}\n{x:i$}{var} := {aexp}"),
-            Stm::Skip(_) => format!("{ss}\n{x:i$}skip"),
-            Stm::IfThenElse(_, g, stm1, stm2) => {
+            Stm::AExp(_, _, aexp) => format!("{ss}\n{x:i$}{aexp}"),
+            Stm::BExp(_, _, bexp) => format!("{ss}\n{x:i$}{bexp}"),
+            Stm::Ass(_, _, var, aexp) => format!("{ss}\n{x:i$}{var} := {aexp}"),
+            Stm::Skip(_, _) => format!("{ss}\n{x:i$}skip"),
+            Stm::IfThenElse(_, _, g, stm1, stm2) => {
                 format!(
                     "{ss}\n{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
                     print_nice(&stm1, inv, ii),
                     print_nice(&stm2, inv, ii),
                 )
             }
-            Stm::While(_, g, stm) => {
+            Stm::While(_, _, g, stm) => {
                 format!(
                     "{ss}\n{x:i$}while {g} do\n{}\n{x:i$}done",
                     print_nice(&stm, inv, ii),
                 )
             }
-            Stm::Comp(_, stm1, stm2) => {
+            Stm::Comp(_, _, stm1, stm2) => {
                 format!(
                     "{};\n{}",
                     print_nice(&stm1, inv, i),
