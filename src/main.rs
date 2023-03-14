@@ -1,12 +1,17 @@
 use std::{collections::BTreeMap, fmt::Display, fs};
 
-use abstraction::{AIResult, AbsDomain};
+use abstraction::{AbsDomain, AbsValueDomain};
 use colored::Colorize;
 use control_flow_graph::ControlFlowGraph;
+use interpreter::AIResult;
 use syntax::{build_ast, Stm};
 
 use crate::{
-    abstraction::{interval_interpreter::IntervalInterpreter, AbstractInterpreter},
+    abstraction::interval::{IntervalValueDomain, Limit},
+    interpreter::{
+        interval_interpreter::{IntervalDomain, IntervalInterpreter},
+        AbstractInterpreter,
+    },
     syntax::Id,
 };
 
@@ -16,26 +21,46 @@ extern crate pest_derive;
 
 mod abstraction;
 mod control_flow_graph;
+pub mod interpreter;
 pub mod syntax;
 
 fn main() {
     let input = fs::read_to_string("src/test.while").unwrap();
     println!("Paring input:\n{}", input);
+
     let prog = build_ast(&input);
     println!("\nParsed input:\n{}", prog);
+
     let graph = ControlFlowGraph::new(&prog);
-    let inv = IntervalInterpreter::execute(graph);
+    let vars = prog.get_vars();
+    let nums = prog.get_numerals();
+
+    let dlb = match nums.first() {
+        Some(n) => Limit::Num(n.clone()),
+        None => Limit::InfN,
+    };
+    let dub = match nums.last() {
+        Some(n) => Limit::Num(n.clone()),
+        None => Limit::InfP,
+    };
+    let v_dom = IntervalValueDomain::new(dlb, dub);
+    let dom = IntervalDomain::new(v_dom, &vars);
+
+    let ai = IntervalInterpreter::new(dom);
+    let inv = ai.execute(graph);
     println!("\n{:-<30}", "Output:".blue());
     println!("{}", pretty_result(&prog, &inv))
 }
 
-fn pretty_result<S>(prog: &Stm, inv: &AIResult<S>) -> String
+fn pretty_result<AVD, AD>(prog: &Stm, inv: &AIResult<AVD, AD>) -> String
 where
-    S: AbsDomain + Display,
+    AVD: AbsValueDomain,
+    AD: AbsDomain<AVD>,
+    AD::State: Display,
 {
-    fn get_inv<'a, S>(stm: &Stm, inv: &'a BTreeMap<Id, S>) -> (Id, Option<&'a S>)
+    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Id, S>) -> (Id, Option<S>)
     where
-        S: AbsDomain + Display,
+        S: Clone + Display,
     {
         let id = match stm {
             Stm::AExp(id, _) => id,
@@ -46,12 +71,12 @@ where
             Stm::While(id, _, _) => id,
             Stm::Comp(id, _, _) => id,
         };
-        (*id, inv.get(id))
+        (*id, inv.get(id).cloned())
     }
 
     fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Id, S>, i: usize) -> String
     where
-        S: AbsDomain + Display,
+        S: Clone + Display,
     {
         let x = "";
         let ii = i + 4;

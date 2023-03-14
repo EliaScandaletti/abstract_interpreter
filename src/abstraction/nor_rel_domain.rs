@@ -1,54 +1,87 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::BTreeMap, fmt::Display};
 
 use crate::syntax::Variable;
 
-use super::{AbsDomain, AbsValue};
+use super::{AbsDomain, AbsValueDomain};
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum NonRelationalDomain<Value> {
-    Bot,
-    Vars(HashMap<Variable, Value>),
+#[derive(Debug, Clone)]
+pub struct NonRelationalDomain<AVD>
+where
+    AVD: AbsValueDomain,
+{
+    v_dom: AVD,
+    top: BTreeMap<Variable, AVD::Value>,
 }
 
-impl<Value> AbsDomain for NonRelationalDomain<Value>
-where
-    Value: AbsValue + Clone,
-{
-    type Value = Value;
+#[derive(Debug, Clone, PartialEq)]
+pub enum NonRelationalState<Value> {
+    Bot,
+    Vars(BTreeMap<Variable, Value>),
+}
 
-    fn ass(&mut self, var: &Variable, val: Self::Value) {
-        if val == Value::bot() {
-            *self = NonRelationalDomain::Bot;
+impl<AVD> NonRelationalDomain<AVD>
+where
+    AVD: AbsValueDomain,
+{
+    pub fn new<'a, I>(v_dom: AVD, vars: &'a I) -> Self
+    where
+        &'a I: IntoIterator,
+        <&'a I as IntoIterator>::IntoIter: Iterator<Item = &'a Variable>,
+    {
+        let top = vars
+            .into_iter()
+            .map(|v: &String| (v.clone(), v_dom.top()))
+            .collect();
+        Self { v_dom, top }
+    }
+}
+
+impl<AVD> AbsDomain<AVD> for NonRelationalDomain<AVD>
+where
+    AVD: AbsValueDomain + Clone,
+    AVD::Value: Clone + Display,
+{
+    type State = NonRelationalState<AVD::Value>;
+
+    fn value_domain(&self) -> AVD {
+        self.v_dom.clone()
+    }
+
+    fn ass(&self, state: &mut Self::State, var: &Variable, val: AVD::Value) {
+        use self::NonRelationalState::*;
+        if val == self.v_dom.bot() {
+            *state = Bot;
         } else {
-            match self {
-                NonRelationalDomain::Bot => (),
-                NonRelationalDomain::Vars(vars) => {
+            match state {
+                Bot => (),
+                Vars(vars) => {
                     vars.insert(var.to_string(), val);
                 }
             }
         }
     }
 
-    fn get_var(&self, var: &Variable) -> Self::Value {
-        match self {
-            Self::Bot => Value::bot(),
-            Self::Vars(vars) => vars.get(var).unwrap_or(&Value::top()).clone(),
+    fn get_var(&self, state: &Self::State, var: &Variable) -> AVD::Value {
+        use self::NonRelationalState::*;
+        match state {
+            Bot => self.v_dom.bot(),
+            Vars(vars) => vars.get(var).unwrap_or(&self.v_dom.top()).clone(),
         }
     }
 
-    fn bot() -> Self {
-        NonRelationalDomain::Bot
+    fn bot(&self) -> Self::State {
+        NonRelationalState::Bot
     }
 
-    fn top() -> Self {
-        NonRelationalDomain::Vars(HashMap::new())
+    fn top(&self) -> Self::State {
+        self::NonRelationalState::Vars(self.top.clone())
     }
 
-    fn lub(rhs: &Self, lhs: &Self) -> Self {
-        use NonRelationalDomain::*;
-        match (rhs, lhs) {
-            (Bot, _) => lhs.clone(),
-            (_, Bot) => rhs.clone(),
+    fn lub(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State {
+        use self::NonRelationalState::*;
+        match (lhs, rhs) {
+            (Bot, _) => rhs.clone(),
+            (_, Bot) => lhs.clone(),
             (Vars(v1), Vars(v2)) => {
                 let v = v1
                     .keys()
@@ -56,7 +89,7 @@ where
                     .chain(v2.keys())
                     .map(|k| match (v1.get(k), v2.get(k)) {
                         (None, Some(i)) | (Some(i), None) => (k.clone(), i.clone()),
-                        (Some(i1), Some(i2)) => (k.clone(), Value::lub(i1, i2)),
+                        (Some(i1), Some(i2)) => (k.clone(), self.v_dom.lub(i1, i2)),
                         (None, None) => unreachable!(),
                     })
                     .collect();
@@ -66,11 +99,10 @@ where
         }
     }
 
-    fn glb(rhs: &Self, lhs: &Self) -> Self {
-        use NonRelationalDomain::*;
-        match (rhs, lhs) {
-            (Bot, _) => lhs.clone(),
-            (_, Bot) => rhs.clone(),
+    fn glb(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State {
+        use self::NonRelationalState::*;
+        match (lhs, rhs) {
+            (Bot, _) | (_, Bot) => Bot,
             (Vars(v1), Vars(v2)) => {
                 let v = v1
                     .keys()
@@ -78,7 +110,7 @@ where
                     .chain(v2.keys())
                     .map(|k| match (v1.get(k), v2.get(k)) {
                         (None, Some(i)) | (Some(i), None) => (k.clone(), i.clone()),
-                        (Some(i1), Some(i2)) => (k.clone(), Value::glb(i1, i2)),
+                        (Some(i1), Some(i2)) => (k.clone(), self.v_dom.glb(i1, i2)),
                         (None, None) => unreachable!(),
                     })
                     .collect();
@@ -89,14 +121,14 @@ where
     }
 }
 
-impl<Value> Display for NonRelationalDomain<Value>
+impl<Value> Display for NonRelationalState<Value>
 where
-    Value: AbsValue + Display,
+    Value: Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NonRelationalDomain::Bot => write!(f, "dead code"),
-            NonRelationalDomain::Vars(vars) => {
+            Self::Bot => write!(f, "dead code"),
+            Self::Vars(vars) => {
                 if vars.is_empty() {
                     write!(f, "any value")?;
                 }

@@ -1,11 +1,11 @@
 use std::{
     fmt::Display,
-    ops::{Add, Div, Mul, Neg, Sub},
+    ops::{Add, Mul, Neg, Sub},
 };
 
 use crate::syntax::Numeral;
 
-use super::AbsValue;
+use super::AbsValueDomain;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Limit {
@@ -98,27 +98,6 @@ pub enum Interval {
     Int { lb: Limit, ub: Limit },
 }
 
-impl From<Numeral> for Interval {
-    fn from(value: Numeral) -> Self {
-        (Limit::Num(value), Limit::Num(value)).into()
-    }
-}
-
-impl From<(Limit, Limit)> for Interval {
-    fn from((lb, ub): (Limit, Limit)) -> Self {
-        if lb == ub {
-            if let Limit::Num(_) = lb {
-                return Self::Int { lb, ub };
-            }
-        }
-        if lb <= ub {
-            Self::Int { lb, ub }
-        } else {
-            Self::Bot
-        }
-    }
-}
-
 impl PartialOrd for Interval {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use std::cmp::Ordering::*;
@@ -140,103 +119,85 @@ impl PartialOrd for Interval {
     }
 }
 
-impl AbsValue for Interval {
-    fn bot() -> Self {
-        Interval::Bot
+#[derive(Debug, Clone)]
+pub struct IntervalValueDomain {
+    dlb: Limit,
+    dub: Limit,
+}
+
+impl IntervalValueDomain {
+    pub fn new(dlb: Limit, dub: Limit) -> Self {
+        Self { dlb, dub }
     }
 
-    fn top() -> Self {
-        (Limit::InfN, Limit::InfP).into()
-    }
-
-    fn lub(lhs: &Self, rhs: &Self) -> Self {
-        use Interval::*;
-        match (lhs, rhs) {
-            (Bot, Bot) => Bot,
-            (Bot, rhs) => *rhs,
-            (lhs, Bot) => *lhs,
-            (Int { lb: a, ub: b }, Int { lb: c, ub: d }) => {
-                let lb = *std::cmp::min(a, c);
-                let ub = *std::cmp::max(b, d);
-                (lb, ub).into()
+    pub fn from_couple(&self, mut lb: Limit, mut ub: Limit) -> Interval {
+        if lb > ub {
+            return Interval::Bot;
+        }
+        if lb == ub {
+            if let Limit::Num(_) = lb {
+                return Interval::Int { lb, ub };
             }
         }
-    }
-
-    fn glb(lhs: &Self, rhs: &Self) -> Self {
-        use Interval::*;
-        match (lhs, rhs) {
-            (Bot, _) | (_, Bot) => Bot,
-            (Int { lb: a, ub: b }, Int { lb: c, ub: d }) => {
-                let lb = *std::cmp::max(a, c);
-                let ub = *std::cmp::min(b, d);
-                if lb <= ub {
-                    (lb, ub).into()
-                } else {
-                    Bot
-                }
-            }
+        if lb < self.dlb {
+            lb = Limit::InfN
         }
+        if ub > self.dub {
+            ub = Limit::InfP
+        }
+        Interval::Int { lb, ub }
     }
 }
 
-impl Neg for Interval {
-    type Output = Self;
+impl AbsValueDomain for IntervalValueDomain {
+    type Value = Interval;
 
-    fn neg(self) -> Self::Output {
+    fn value_from_num(&self, num: &Numeral) -> Self::Value {
+        self.from_couple(Limit::Num(num.clone()), Limit::Num(num.clone()))
+    }
+
+    fn cmp(&self, lhs: &Self::Value, rhs: &Self::Value) -> bool {
+        lhs < rhs
+    }
+
+    fn neg(&self, rhs: &Self::Value) -> Self::Value {
         use Interval::*;
-        match self {
+        match rhs {
             Bot => Bot,
-            Int { lb: a, ub: b } => (-b, -a).into(),
+            &Int { lb: a, ub: b } => self.from_couple(-b, -a),
         }
     }
-}
 
-impl Add for Interval {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
+    fn add(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
         use Interval::*;
-        match (self, rhs) {
+        match (lhs, rhs) {
             (Bot, _) | (_, Bot) => Bot,
-            (Int { lb: a, ub: b }, Int { lb: c, ub: d }) => (a + c, b + d).into(),
+            (&Int { lb: a, ub: b }, &Int { lb: c, ub: d }) => self.from_couple(a + c, b + d),
         }
     }
-}
 
-impl Sub for Interval {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        self + (-rhs)
+    fn sub(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
+        self.add(lhs, &self.neg(rhs))
     }
-}
 
-impl Mul for Interval {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
+    fn mul(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
         use Interval::*;
-        match (self, rhs) {
+        match (lhs, rhs) {
             (Bot, _) | (_, Bot) => Bot,
-            (Int { lb: a, ub: b }, Int { lb: c, ub: d }) => {
+            (&Int { lb: a, ub: b }, &Int { lb: c, ub: d }) => {
                 let lb = std::cmp::min(std::cmp::min(a * c, a * d), std::cmp::min(b * c, b * d));
                 let ub = std::cmp::max(std::cmp::max(a * c, a * d), std::cmp::max(b * c, b * d));
-                (lb, ub).into()
+                self.from_couple(lb, ub)
             }
         }
     }
-}
 
-impl Div for Interval {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
+    fn div(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
         use Interval::*;
         use Limit::*;
-        match (self, rhs) {
+        match (lhs, rhs) {
             (Bot, _) | (_, Bot) => Bot,
-            (Int { lb: a, ub: b }, Int { lb: c, ub: d }) => {
+            (&Int { lb: a, ub: b }, &Int { lb: c, ub: d }) => {
                 if c == Num(0) && d == Num(0) {
                     Bot
                 } else if Num(1) <= c {
@@ -270,7 +231,7 @@ impl Div for Interval {
                             (Num(b), Num(d)) => Num(b / d),
                         },
                     );
-                    (lb, ub).into()
+                    self.from_couple(lb, ub)
                 } else if d <= Num(-1) {
                     let lb = std::cmp::min(
                         // b / c
@@ -304,13 +265,47 @@ impl Div for Interval {
                             (Num(a), Num(d)) => Num(a / d),
                         },
                     );
-                    (lb, ub).into()
+                    self.from_couple(lb, ub)
                 } else {
-                    Self::lub(
-                        &(self / Self::glb(&rhs, &(Num(1), InfP).into())),
-                        &(self / Self::glb(&rhs, &(InfN, Num(-1)).into())),
+                    self.lub(
+                        &(self.div(lhs, &self.glb(rhs, &self.from_couple(Num(1), InfP)))),
+                        &(self.div(lhs, &self.glb(rhs, &self.from_couple(InfN, Num(-1))))),
                     )
                 }
+            }
+        }
+    }
+
+    fn bot(&self) -> Self::Value {
+        Interval::Bot
+    }
+
+    fn top(&self) -> Self::Value {
+        self.from_couple(Limit::InfN, Limit::InfP)
+    }
+
+    fn lub(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
+        use Interval::*;
+        match (lhs, rhs) {
+            (Bot, Bot) => Bot,
+            (Bot, rhs) => *rhs,
+            (lhs, Bot) => *lhs,
+            (&Int { lb: a, ub: b }, &Int { lb: c, ub: d }) => {
+                let lb = std::cmp::min(a, c);
+                let ub = std::cmp::max(b, d);
+                self.from_couple(lb, ub)
+            }
+        }
+    }
+
+    fn glb(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
+        use Interval::*;
+        match (lhs, rhs) {
+            (Bot, _) | (_, Bot) => Bot,
+            (&Int { lb: a, ub: b }, &Int { lb: c, ub: d }) => {
+                let lb = std::cmp::max(a, c);
+                let ub = std::cmp::min(b, d);
+                self.from_couple(lb, ub)
             }
         }
     }
