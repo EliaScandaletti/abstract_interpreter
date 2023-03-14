@@ -180,7 +180,7 @@ pub enum Stm {
     Skip(Id, bool),
     IfThenElse(Id, bool, BExp, Box<Stm>, Box<Stm>),
     While(Id, bool, BExp, Box<Stm>),
-    Comp(Id, bool, Box<Stm>, Box<Stm>),
+    Comp(bool, Box<Stm>, Box<Stm>),
 }
 
 impl Stm {
@@ -192,9 +192,10 @@ impl Stm {
             Stm::Skip(id, _) => id,
             Stm::IfThenElse(id, _, _, _, _) => id,
             Stm::While(id, _, _, _) => id,
-            Stm::Comp(id, _, _, _) => id,
+            Stm::Comp(_, s1, _) => s1.id(),
         }
     }
+    
     pub fn get_vars(&self) -> BTreeSet<Variable> {
         match self {
             Stm::AExp(_, _, e) => e.vars(),
@@ -216,7 +217,7 @@ impl Stm {
                 let it2 = s.get_vars().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, _, s1, s2) => {
+            Stm::Comp(_, s1, s2) => {
                 let it1 = s1.get_vars().into_iter();
                 let it2 = s2.get_vars().into_iter();
                 it1.chain(it2).collect()
@@ -240,7 +241,7 @@ impl Stm {
                 let it2 = s.get_numerals().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, _, s1, s2) => {
+            Stm::Comp(_, s1, s2) => {
                 let it1 = s1.get_numerals().into_iter();
                 let it2 = s2.get_numerals().into_iter();
                 it1.chain(it2).collect()
@@ -366,7 +367,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
             }
         })
         .map_infix(|lhs, op, rhs| match op.as_rule() {
-            Rule::comp => Stm::Comp(0, false, lhs.into(), rhs.into()),
+            Rule::comp => Stm::Comp(false, lhs.into(), rhs.into()),
             _ => unreachable!(),
         })
         .map_prefix(|op, rhs| match op.as_rule() {
@@ -377,7 +378,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                 Stm::Skip(id, _) => Stm::Skip(id, true),
                 Stm::IfThenElse(id, _, g, e1, e2) => Stm::IfThenElse(id, true, g, e1, e2),
                 Stm::While(id, _, g, e) => Stm::While(id, true, g, e),
-                Stm::Comp(id, _, s1, s2) => Stm::Comp(id, true, s1, s2),
+                Stm::Comp(_, s1, s2) => Stm::Comp(true, s1, s2),
             },
             _ => unreachable!(),
         })
@@ -439,7 +440,7 @@ fn fmt(stm: &Stm, i: usize) -> String {
             )
         }
         Stm::While(_, _, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
-        Stm::Comp(_, _, stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
+        Stm::Comp(_, stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
     }
 }
 

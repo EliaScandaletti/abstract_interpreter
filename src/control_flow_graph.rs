@@ -258,7 +258,7 @@ impl ControlFlowGraph {
                 .label_pos(0, *id)
                 .finalize(),
 
-            Stm::Comp(_, _, stm1, stm2) => GraphBuilder::new(3)
+            Stm::Comp(_, stm1, stm2) => GraphBuilder::new(3)
                 .set_entry(0)
                 .set_exit(2)
                 .add_subgraph(0, Self::new(&*stm1), 1)

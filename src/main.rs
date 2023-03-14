@@ -95,7 +95,7 @@ where
                     print_nice(&stm, inv, ii),
                 )
             }
-            Stm::Comp(_, _, stm1, stm2) => {
+            Stm::Comp(_, stm1, stm2) => {
                 format!(
                     "{};\n{}",
                     print_nice(&stm1, inv, i),
