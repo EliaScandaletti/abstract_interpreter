@@ -62,15 +62,7 @@ where
     where
         S: Clone + Display,
     {
-        let id = match stm {
-            Stm::AExp(id, _, _) => id,
-            Stm::BExp(id, _, _) => id,
-            Stm::Ass(id, _, _, _) => id,
-            Stm::Skip(id, _) => id,
-            Stm::IfThenElse(id, _, _, _, _) => id,
-            Stm::While(id, _, _, _) => id,
-            Stm::Comp(id, _, _, _) => id,
-        };
+        let id = stm.id();
         (*id, inv.get(id).cloned())
     }
 
