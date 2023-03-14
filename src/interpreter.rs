@@ -15,7 +15,7 @@ where
     AD: AbsDomain<AVD>,
 {
     pub inv: BTreeMap<Label, AD::State>,
-    pub last_inv: AD::State,
+    pub exit_point: Label,
 }
 
 pub trait AbstractInterpreter<AVD, AD>
@@ -119,12 +119,9 @@ where
             }
         }
 
-        let last_inv = invariants.get(&exit_point).unwrap().clone();
-        let inv = invariants
-            .into_iter()
-            .filter(|(l, _)| l != exit_point)
-            .collect();
-
-        AIResult { inv, last_inv }
+        AIResult {
+            inv: invariants,
+            exit_point: *exit_point,
+        }
     }
 }

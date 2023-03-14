@@ -36,11 +36,11 @@ fn main() {
     let nums = prog.get_numerals();
 
     let dlb = match nums.first() {
-        Some(n) => Limit::Num(n.clone()),
+        Some(n) => Limit::Num(n.clone() - 1),
         None => Limit::InfN,
     };
     let dub = match nums.last() {
-        Some(n) => Limit::Num(n.clone()),
+        Some(n) => Limit::Num(n.clone() + 1),
         None => Limit::InfP,
     };
     let v_dom = IntervalValueDomain::new(dlb, dub);
@@ -58,6 +58,9 @@ where
     AD: AbsDomain<AVD>,
     AD::State: Display,
 {
+    let AIResult { inv, exit_point } = inv;
+    let last_inv = inv.get(exit_point).unwrap();
+
     fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Label, S>) -> (Label, Option<S>)
     where
         S: Clone + Display,
@@ -105,6 +108,10 @@ where
         }
     }
 
-    let body = print_nice(prog, &inv.inv, 8);
-    format!("{body}\n{}", inv.last_inv.to_string().purple())
+    let i = 8;
+    let body = print_nice(prog, inv, i);
+    format!(
+        "{body}\n{}",
+        format!("{exit_point}: {last_inv}").purple().purple()
+    )
 }
