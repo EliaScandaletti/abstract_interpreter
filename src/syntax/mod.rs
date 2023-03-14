@@ -186,16 +186,28 @@ pub enum Stm {
 impl Stm {
     pub fn id(&self) -> &Id {
         match self {
-            Stm::AExp(id, _, _) => id,
-            Stm::BExp(id, _, _) => id,
-            Stm::Ass(id, _, _, _) => id,
-            Stm::Skip(id, _) => id,
-            Stm::IfThenElse(id, _, _, _, _) => id,
-            Stm::While(id, _, _, _) => id,
+            Stm::AExp(id, _, _)
+            | Stm::BExp(id, _, _)
+            | Stm::Ass(id, _, _, _)
+            | Stm::Skip(id, _)
+            | Stm::IfThenElse(id, _, _, _, _)
+            | Stm::While(id, _, _, _) => id,
             Stm::Comp(_, s1, _) => s1.id(),
         }
     }
-    
+
+    pub fn next_id(&self) -> Id {
+        match self {
+            Stm::AExp(id, _, _)
+            | Stm::BExp(id, _, _)
+            | Stm::Ass(id, _, _, _)
+            | Stm::Skip(id, _) => id + 1,
+            Stm::IfThenElse(_, _, _, _, s) | Stm::While(_, _, _, s) | Stm::Comp(_, _, s) => {
+                s.id() + 1
+            }
+        }
+    }
+
     pub fn get_vars(&self) -> BTreeSet<Variable> {
         match self {
             Stm::AExp(_, _, e) => e.vars(),
