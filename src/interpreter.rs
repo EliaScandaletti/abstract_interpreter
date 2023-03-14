@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, VecDeque};
 
 use crate::{
     abstraction::{AbsDomain, AbsValueDomain},
-    control_flow_graph::{Command, ControlFlowGraph, Label},
-    syntax::{AExp, BExp, Id},
+    control_flow_graph::{Command, ControlFlowGraph},
+    syntax::{AExp, BExp, Label},
 };
 
 #[derive(Debug)]
@@ -14,7 +14,7 @@ where
     AVD: AbsValueDomain,
     AD: AbsDomain<AVD>,
 {
-    pub inv: BTreeMap<Id, AD::State>,
+    pub inv: BTreeMap<Label, AD::State>,
     pub last_inv: AD::State,
 }
 
@@ -53,12 +53,13 @@ where
     }
 
     fn execute(&self, graph: ControlFlowGraph) -> AIResult<AVD, AD> {
-        let arcs = graph.arcs();
         let labels = graph.labels();
+        let wid_pts = graph.wid_pts();
         let entry_point = graph.entry_point();
         let exit_point = graph.exit_point();
+        let arcs = graph.arcs();
 
-        let fwd_dep: BTreeMap<Label, Vec<Label>> = labels
+        let fwd_dep: BTreeMap<_, Vec<_>> = labels
             .iter()
             .map(|l| {
                 let dep = arcs
@@ -69,7 +70,7 @@ where
                 (*l, dep)
             })
             .collect();
-        let bwd_dep: BTreeMap<Label, Vec<Label>> = labels
+        let bwd_dep: BTreeMap<_, Vec<_>> = labels
             .iter()
             .map(|l| {
                 let dep = arcs
@@ -85,7 +86,7 @@ where
             labels.iter().map(|l| (*l, self.domain().bot())).collect();
         *invariants.get_mut(&entry_point).unwrap() = self.domain().top();
 
-        let mut queue: VecDeque<_> = labels.iter().filter(|&&l| l != entry_point).collect();
+        let mut queue: VecDeque<_> = labels.iter().filter(|&l| l != entry_point).collect();
 
         while let Some(n) = queue.pop_front() {
             let old = invariants.get(&n).unwrap();
@@ -99,22 +100,29 @@ where
                     let ns = self.evaluate(ps.clone(), comm);
                     self.domain().lub(&s, &ns)
                 });
+            let new = if wid_pts.contains(n) {
+                new
+                // self.domain().widening(old, new) // TODO
+            } else {
+                new
+            };
 
             if *old != new {
                 invariants.insert(n.clone(), new);
                 match fwd_dep.get(&n) {
-                    Some(vs) => queue.extend(vs),
+                    Some(vs) => {
+                        let tail: Vec<_> = vs.iter().filter(|n| !queue.contains(n)).collect();
+                        queue.extend(tail)
+                    }
                     None => (),
                 }
             }
         }
 
-        let map = graph.label_to_id();
         let last_inv = invariants.get(&exit_point).unwrap().clone();
         let inv = invariants
             .into_iter()
-            .filter(|(l, _)| *l != exit_point)
-            .map(|(l, s)| (*map.get(&l).unwrap(), s))
+            .filter(|(l, _)| l != exit_point)
             .collect();
 
         AIResult { inv, last_inv }

@@ -12,7 +12,7 @@ use crate::{
         interval_interpreter::{IntervalDomain, IntervalInterpreter},
         AbstractInterpreter,
     },
-    syntax::Id,
+    syntax::Label,
 };
 
 extern crate pest;
@@ -58,7 +58,7 @@ where
     AD: AbsDomain<AVD>,
     AD::State: Display,
 {
-    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Id, S>) -> (Id, Option<S>)
+    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Label, S>) -> (Label, Option<S>)
     where
         S: Clone + Display,
     {
@@ -66,7 +66,7 @@ where
         (*id, inv.get(id).cloned())
     }
 
-    fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Id, S>, i: usize) -> String
+    fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Label, S>, i: usize) -> String
     where
         S: Clone + Display,
     {

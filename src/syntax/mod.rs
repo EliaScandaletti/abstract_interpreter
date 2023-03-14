@@ -48,9 +48,9 @@ pub type Numeral = i32;
 
 pub type Variable = String;
 
-pub type Id = usize;
-fn get_id() -> Id {
-    static mut ID: Id = 1;
+pub type Label = usize;
+fn get_id() -> Label {
+    static mut ID: Label = 1;
     unsafe {
         let ret = ID;
         ID += 1;
@@ -174,17 +174,17 @@ impl BExp {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Stm {
-    AExp(Id, bool, AExp),
-    BExp(Id, bool, BExp),
-    Ass(Id, bool, Variable, AExp),
-    Skip(Id, bool),
-    IfThenElse(Id, bool, BExp, Box<Stm>, Box<Stm>),
-    While(Id, bool, BExp, Box<Stm>),
+    AExp(Label, bool, AExp),
+    BExp(Label, bool, BExp),
+    Ass(Label, bool, Variable, AExp),
+    Skip(Label, bool),
+    IfThenElse(Label, bool, BExp, Box<Stm>, Box<Stm>),
+    While(Label, bool, BExp, Box<Stm>),
     Comp(bool, Box<Stm>, Box<Stm>),
 }
 
 impl Stm {
-    pub fn id(&self) -> &Id {
+    pub fn id(&self) -> &Label {
         match self {
             Stm::AExp(id, _, _)
             | Stm::BExp(id, _, _)
@@ -193,18 +193,6 @@ impl Stm {
             | Stm::IfThenElse(id, _, _, _, _)
             | Stm::While(id, _, _, _) => id,
             Stm::Comp(_, s1, _) => s1.id(),
-        }
-    }
-
-    pub fn next_id(&self) -> Id {
-        match self {
-            Stm::AExp(id, _, _)
-            | Stm::BExp(id, _, _)
-            | Stm::Ass(id, _, _, _)
-            | Stm::Skip(id, _) => id + 1,
-            Stm::IfThenElse(_, _, _, _, s) | Stm::While(_, _, _, s) | Stm::Comp(_, _, s) => {
-                s.id() + 1
-            }
         }
     }
 
