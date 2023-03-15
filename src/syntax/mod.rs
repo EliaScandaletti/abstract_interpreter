@@ -428,14 +428,17 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
         .parse(pairs)
 }
 
-pub fn build_ast(input: &str) -> Result<Stm, Error<Rule>> {
+pub fn build_ast(input: &str, path: &str) -> Result<Stm, Error<Rule>> {
     let parse_result = WParser::parse(Rule::program, input);
     match parse_result {
         Ok(mut pairs) => {
             let pairs = pairs.next().unwrap().into_inner();
             Ok(stm_ast(pairs))
         }
-        Err(e) => Err(e),
+        Err(e) => {
+            let e = e.with_path(path);
+            Err(e)
+        }
     }
 }
 

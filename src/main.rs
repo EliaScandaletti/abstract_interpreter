@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Display, fs, process::ExitCode};
+use std::{collections::BTreeMap, env, fmt::Display, fs, process::ExitCode};
 
 use abstraction::{AbsDomain, AbsValueDomain};
 use colored::Colorize;
@@ -25,10 +25,23 @@ pub mod interpreter;
 pub mod syntax;
 
 fn main() -> ExitCode {
-    let input = fs::read_to_string("src/test.while").unwrap();
-    println!("Paring input:\n{}", input);
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        println!("Usage: {} input_file", args[0]);
+        return ExitCode::FAILURE;
+    }
+    let file = &args[1];
 
-    match build_ast(&input) {
+    let input = match fs::read_to_string(file) {
+        Ok(input) => input,
+        Err(e) => {
+            println!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("Parsing input:\n{}", input);
+
+    match build_ast(&input, file) {
         Ok(prog) => {
             println!("\nParsed input:\n{}", prog);
 
@@ -54,7 +67,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
-            println!("Syntax error at line {}", e.line());
+            println!("Syntax error");
             println!("{e}");
             ExitCode::FAILURE
         }
