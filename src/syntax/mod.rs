@@ -476,26 +476,27 @@ impl Display for BExp {
 }
 
 fn fmt(stm: &Stm, i: usize) -> String {
-    let x = format!(
+    let wi = format!(
         "[{}{}]",
         if stm.meta().widening { "w" } else { " " },
         if stm.meta().narrowing { "n" } else { " " }
     )
     .purple();
+    let ei = "";
     let ii = i + 4;
     match stm {
-        Stm::AExp(_, aexp) => format!("{x:i$}{aexp}"),
-        Stm::BExp(_, bexp) => format!("{x:i$}{bexp}"),
-        Stm::Ass(_, var, aexp) => format!("{x:i$}{var} := {aexp}"),
-        Stm::Skip(_) => format!("{x:i$}skip"),
+        Stm::AExp(_, aexp) => format!("{wi:i$}{aexp}"),
+        Stm::BExp(_, bexp) => format!("{wi:i$}{bexp}"),
+        Stm::Ass(_, var, aexp) => format!("{wi:i$}{var} := {aexp}"),
+        Stm::Skip(_) => format!("{wi:i$}skip"),
         Stm::IfThenElse(_, g, stm1, stm2) => {
             format!(
-                "{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
+                "{wi:i$}if {g} then\n{}\n{ei:i$}else\n{}\n{ei:i$}endif",
                 fmt(&stm1, ii),
                 fmt(&stm2, ii)
             )
         }
-        Stm::While(_, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
+        Stm::While(_, g, stm) => format!("{wi:i$}while {g} do\n{}\n{ei:i$}done", fmt(&stm, ii)),
         Stm::Comp(stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
     }
 }
