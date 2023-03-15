@@ -1,10 +1,10 @@
 x := 6;
 y := 1;
+90;
 [wn]
 while -x < 0 do
     y := y * x;
-    [w]
-    if 15 < y then
+    if x+4 < y-1 then
         y := 2
     else
         skip

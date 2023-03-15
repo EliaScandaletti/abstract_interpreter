@@ -58,6 +58,7 @@ where
     {
         let labels = graph.labels();
         let wid_pts = graph.wid_pts();
+        let nar_pts = graph.nar_pts();
         let entry_point = graph.entry_point();
         let exit_point = graph.exit_point();
         let arcs = graph.arcs();
@@ -105,6 +106,38 @@ where
                 });
             let new = if wid_pts.contains(n) {
                 self.domain().widening(old, &new)
+            } else {
+                new
+            };
+
+            if *old != new {
+                invariants.insert(n.clone(), new);
+                match fwd_dep.get(&n) {
+                    Some(vs) => {
+                        let tail: Vec<_> = vs.iter().filter(|n| !queue.contains(n)).collect();
+                        queue.extend(tail)
+                    }
+                    None => (),
+                }
+            }
+        }
+
+        queue.extend(nar_pts.iter().filter(|&l| l != entry_point));
+
+        while let Some(n) = queue.pop_front() {
+            let old = invariants.get(&n).unwrap();
+            let new = bwd_dep
+                .get(&n)
+                .unwrap()
+                .iter()
+                .fold(self.domain().bot(), |s, p| {
+                    let ps = invariants.get(p).unwrap();
+                    let comm = arcs.get(&(*p, *n)).unwrap();
+                    let ns = self.evaluate(ps.clone(), comm);
+                    self.domain().lub(&s, &ns)
+                });
+            let new = if nar_pts.contains(n) {
+                self.domain().narrowing(old, &new)
             } else {
                 new
             };
