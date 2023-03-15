@@ -309,6 +309,28 @@ impl AbsValueDomain for IntervalValueDomain {
             }
         }
     }
+
+    fn widening(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
+        match (lhs, rhs) {
+            (Interval::Bot, &o) | (&o, Interval::Bot) => o,
+            (&Interval::Int { lb: a, ub: b }, &Interval::Int { lb: c, ub: d }) => {
+                let lb = if a <= c { a } else { Limit::InfN };
+                let ub = if b >= d { b } else { Limit::InfP };
+                self.from_couple(lb, ub)
+            }
+        }
+    }
+
+    fn narrowing(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value {
+        match (lhs, rhs) {
+            (Interval::Bot, _) | (_, Interval::Bot) => Interval::Bot,
+            (&Interval::Int { lb: a, ub: b }, &Interval::Int { lb: c, ub: d }) => {
+                let lb = if a == Limit::InfN { c } else { a };
+                let ub = if b == Limit::InfP { d } else { b };
+                self.from_couple(lb, ub)
+            }
+        }
+    }
 }
 
 impl Display for Interval {

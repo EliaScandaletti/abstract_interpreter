@@ -119,6 +119,52 @@ where
             }
         }
     }
+
+    fn widening(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State {
+        use self::NonRelationalState::*;
+        let bot = self.v_dom.bot();
+        match (lhs, rhs) {
+            (Bot, o) | (o, Bot) => o.clone(),
+            (Vars(v1), Vars(v2)) => {
+                let v = v1
+                    .keys()
+                    .into_iter()
+                    .chain(v2.keys().into_iter())
+                    .cloned()
+                    .map(|k| {
+                        let v1 = v1.get(&k).unwrap_or(&bot);
+                        let v2 = v2.get(&k).unwrap_or(&bot);
+                        (k, self.v_dom.widening(v1, v2))
+                    })
+                    .collect();
+
+                Vars(v)
+            }
+        }
+    }
+
+    fn narrowing(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State {
+        use self::NonRelationalState::*;
+        let top = self.v_dom.top();
+        match (lhs, rhs) {
+            (Bot, o) | (o, Bot) => o.clone(),
+            (Vars(v1), Vars(v2)) => {
+                let v = v1
+                    .keys()
+                    .into_iter()
+                    .chain(v2.keys().into_iter())
+                    .cloned()
+                    .map(|k| {
+                        let v1 = v1.get(&k).unwrap_or(&top);
+                        let v2 = v2.get(&k).unwrap_or(&top);
+                        (k, self.v_dom.narrowing(v1, v2))
+                    })
+                    .collect();
+
+                Vars(v)
+            }
+        }
+    }
 }
 
 impl<Value> Display for NonRelationalState<Value>

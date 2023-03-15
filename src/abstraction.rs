@@ -19,8 +19,8 @@ pub trait AbsValueDomain: Sized {
     fn top(&self) -> Self::Value;
     fn lub(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
     fn glb(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
-    // fn widening(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
-    // fn narrowing(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
+    fn widening(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
+    fn narrowing(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
     // fn gamma<T>(&self, val: &Self::Value) -> T;
     // fn alpha<T>(&self, val: T) -> Self::Value;
 }
@@ -38,10 +38,10 @@ where
 
     fn bot(&self) -> Self::State;
     fn top(&self) -> Self::State;
-    fn lub(&self, rhs: &Self::State, lhs: &Self::State) -> Self::State;
-    fn glb(&self, rhs: &Self::State, lhs: &Self::State) -> Self::State;
-    // fn widening(rhs: &Self::State, lhs: &Self::State) -> Self::State;
-    // fn narrowing(rhs: &Self::State, lhs: &Self::State) -> Self::State;
+    fn lub(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
+    fn glb(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
+    fn widening(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
+    fn narrowing(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
     // fn gamma<T>(val: &Self::State) -> T;
     // fn alpha<T>(val: T) -> Self::State;
 }

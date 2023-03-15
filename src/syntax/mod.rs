@@ -40,6 +40,7 @@ lazy_static::lazy_static! {
         // Precedence is defined lowest to highest
         PrattParser::new()
         .op(Op::infix(comp, Left))
+        .op(Op::prefix(wid))
     };
 }
 
@@ -47,9 +48,9 @@ pub type Numeral = i32;
 
 pub type Variable = String;
 
-pub type Id = usize;
-fn get_id() -> Id {
-    static mut ID: Id = 1;
+pub type Label = usize;
+fn get_id() -> Label {
+    static mut ID: Label = 1;
     unsafe {
         let ret = ID;
         ID += 1;
@@ -72,6 +73,50 @@ pub enum AExp {
     PostDec(Variable),
 }
 
+impl AExp {
+    fn vars(&self) -> BTreeSet<Variable> {
+        match self {
+            AExp::Num(_) => BTreeSet::new(),
+            AExp::Var(x)
+            | AExp::PreInc(x)
+            | AExp::PreDec(x)
+            | AExp::PostInc(x)
+            | AExp::PostDec(x) => {
+                let mut ret = BTreeSet::new();
+                ret.insert(x.clone());
+                ret
+            }
+            AExp::Add(e1, e2) | AExp::Sub(e1, e2) | AExp::Mul(e1, e2) | AExp::Div(e1, e2) => {
+                let it1 = e1.vars().into_iter();
+                let it2 = e2.vars().into_iter();
+                it1.chain(it2).collect()
+            }
+            AExp::Neg(e) => e.vars(),
+        }
+    }
+
+    fn numerals(&self) -> BTreeSet<Numeral> {
+        match self {
+            AExp::Num(n) => {
+                let mut ret = BTreeSet::new();
+                ret.insert(n.clone());
+                ret
+            }
+            AExp::Var(_)
+            | AExp::PreInc(_)
+            | AExp::PreDec(_)
+            | AExp::PostInc(_)
+            | AExp::PostDec(_) => BTreeSet::new(),
+            AExp::Add(e1, e2) | AExp::Sub(e1, e2) | AExp::Mul(e1, e2) | AExp::Div(e1, e2) => {
+                let it1 = e1.numerals().into_iter();
+                let it2 = e2.numerals().into_iter();
+                it1.chain(it2).collect()
+            }
+            AExp::Neg(e) => e.numerals(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum BExp {
     True,
@@ -91,112 +136,100 @@ impl BExp {
             _ => BExp::Not(e.into()),
         }
     }
+
+    fn vars(&self) -> BTreeSet<Variable> {
+        match self {
+            BExp::True | BExp::False => BTreeSet::new(),
+            BExp::Eq(e1, e2) | BExp::Neq(e1, e2) | BExp::Lt(e1, e2) => {
+                let it1 = e1.vars().into_iter();
+                let it2 = e2.vars().into_iter();
+                it1.chain(it2).collect()
+            }
+            BExp::And(e1, e2) | BExp::Or(e1, e2) => {
+                let it1 = e1.vars().into_iter();
+                let it2 = e2.vars().into_iter();
+                it1.chain(it2).collect()
+            }
+            BExp::Not(e) => e.vars(),
+        }
+    }
+
+    fn numerals(&self) -> BTreeSet<Numeral> {
+        match self {
+            BExp::True | BExp::False => BTreeSet::new(),
+            BExp::Eq(e1, e2) | BExp::Neq(e1, e2) | BExp::Lt(e1, e2) => {
+                let it1 = e1.numerals().into_iter();
+                let it2 = e2.numerals().into_iter();
+                it1.chain(it2).collect()
+            }
+            BExp::And(e1, e2) | BExp::Or(e1, e2) => {
+                let it1 = e1.numerals().into_iter();
+                let it2 = e2.numerals().into_iter();
+                it1.chain(it2).collect()
+            }
+            BExp::Not(e) => e.numerals(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Stm {
-    AExp(Id, AExp),
-    BExp(Id, BExp),
-    Ass(Id, Variable, AExp),
-    Skip(Id),
-    IfThenElse(Id, BExp, Box<Stm>, Box<Stm>),
-    While(Id, BExp, Box<Stm>),
-    Comp(Id, Box<Stm>, Box<Stm>),
-}
-
-fn aexp_vars(e: &AExp) -> BTreeSet<Variable> {
-    match e {
-        AExp::Num(_) => BTreeSet::new(),
-        AExp::Var(x) | AExp::PreInc(x) | AExp::PreDec(x) | AExp::PostInc(x) | AExp::PostDec(x) => {
-            let mut ret = BTreeSet::new();
-            ret.insert(x.clone());
-            ret
-        }
-        AExp::Add(e1, e2) | AExp::Sub(e1, e2) | AExp::Mul(e1, e2) | AExp::Div(e1, e2) => {
-            let it1 = aexp_vars(e1).into_iter();
-            let it2 = aexp_vars(e2).into_iter();
-            it1.chain(it2).collect()
-        }
-        AExp::Neg(e) => aexp_vars(e),
-    }
-}
-
-fn bexp_vars(e: &BExp) -> BTreeSet<Variable> {
-    match e {
-        BExp::True | BExp::False => BTreeSet::new(),
-        BExp::Eq(e1, e2) | BExp::Neq(e1, e2) | BExp::Lt(e1, e2) => {
-            let it1 = aexp_vars(e1).into_iter();
-            let it2 = aexp_vars(e2).into_iter();
-            it1.chain(it2).collect()
-        }
-        BExp::And(e1, e2) | BExp::Or(e1, e2) => {
-            let it1 = bexp_vars(e1).into_iter();
-            let it2 = bexp_vars(e2).into_iter();
-            it1.chain(it2).collect()
-        }
-        BExp::Not(e) => bexp_vars(e),
-    }
-}
-
-fn aexp_numerals(e: &AExp) -> BTreeSet<Numeral> {
-    match e {
-        AExp::Num(n) => {
-            let mut ret = BTreeSet::new();
-            ret.insert(n.clone());
-            ret
-        }
-        AExp::Var(_) | AExp::PreInc(_) | AExp::PreDec(_) | AExp::PostInc(_) | AExp::PostDec(_) => {
-            BTreeSet::new()
-        }
-        AExp::Add(e1, e2) | AExp::Sub(e1, e2) | AExp::Mul(e1, e2) | AExp::Div(e1, e2) => {
-            let it1 = aexp_numerals(e1).into_iter();
-            let it2 = aexp_numerals(e2).into_iter();
-            it1.chain(it2).collect()
-        }
-        AExp::Neg(e) => aexp_numerals(e),
-    }
-}
-
-fn bexp_numerals(e: &BExp) -> BTreeSet<Numeral> {
-    match e {
-        BExp::True | BExp::False => BTreeSet::new(),
-        BExp::Eq(e1, e2) | BExp::Neq(e1, e2) | BExp::Lt(e1, e2) => {
-            let it1 = aexp_numerals(e1).into_iter();
-            let it2 = aexp_numerals(e2).into_iter();
-            it1.chain(it2).collect()
-        }
-        BExp::And(e1, e2) | BExp::Or(e1, e2) => {
-            let it1 = bexp_numerals(e1).into_iter();
-            let it2 = bexp_numerals(e2).into_iter();
-            it1.chain(it2).collect()
-        }
-        BExp::Not(e) => bexp_numerals(e),
-    }
+    AExp(Label, bool, AExp),
+    BExp(Label, bool, BExp),
+    Ass(Label, bool, Variable, AExp),
+    Skip(Label, bool),
+    IfThenElse(Label, bool, BExp, Box<Stm>, Box<Stm>),
+    While(Label, bool, BExp, Box<Stm>),
+    Comp(Box<Stm>, Box<Stm>),
 }
 
 impl Stm {
+    pub fn id(&self) -> &Label {
+        match self {
+            Stm::AExp(id, _, _)
+            | Stm::BExp(id, _, _)
+            | Stm::Ass(id, _, _, _)
+            | Stm::Skip(id, _)
+            | Stm::IfThenElse(id, _, _, _, _)
+            | Stm::While(id, _, _, _) => id,
+            Stm::Comp(s1, _) => s1.id(),
+        }
+    }
+
+    pub fn is_widen(&self) -> bool {
+        match self {
+            Stm::AExp(_, w, _)
+            | Stm::BExp(_, w, _)
+            | Stm::Ass(_, w, _, _)
+            | Stm::Skip(_, w)
+            | Stm::IfThenElse(_, w, _, _, _)
+            | Stm::While(_, w, _, _) => *w,
+            Stm::Comp(s1, _) => s1.is_widen(),
+        }
+    }
+
     pub fn get_vars(&self) -> BTreeSet<Variable> {
         match self {
-            Stm::AExp(_, e) => aexp_vars(e),
-            Stm::BExp(_, e) => bexp_vars(e),
-            Stm::Ass(_, x, e) => {
-                let mut ret = aexp_vars(e);
+            Stm::AExp(_, _, e) => e.vars(),
+            Stm::BExp(_, _, e) => e.vars(),
+            Stm::Ass(_, _, x, e) => {
+                let mut ret = e.vars();
                 ret.insert(x.clone());
                 ret
             }
-            Stm::Skip(_) => BTreeSet::new(),
-            Stm::IfThenElse(_, g, s1, s2) => {
-                let it1 = bexp_vars(g).into_iter();
+            Stm::Skip(_, _) => BTreeSet::new(),
+            Stm::IfThenElse(_, _, g, s1, s2) => {
+                let it1 = g.vars().into_iter();
                 let it2 = s1.get_vars().into_iter();
                 let it3 = s2.get_vars().into_iter();
                 it1.chain(it2).chain(it3).collect()
             }
-            Stm::While(_, g, s) => {
-                let it1 = bexp_vars(g).into_iter();
+            Stm::While(_, _, g, s) => {
+                let it1 = g.vars().into_iter();
                 let it2 = s.get_vars().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, s1, s2) => {
+            Stm::Comp(s1, s2) => {
                 let it1 = s1.get_vars().into_iter();
                 let it2 = s2.get_vars().into_iter();
                 it1.chain(it2).collect()
@@ -206,21 +239,21 @@ impl Stm {
 
     pub fn get_numerals(&self) -> BTreeSet<Numeral> {
         match self {
-            Stm::AExp(_, e) | Stm::Ass(_, _, e) => aexp_numerals(e),
-            Stm::BExp(_, e) => bexp_numerals(e),
-            Stm::Skip(_) => BTreeSet::new(),
-            Stm::IfThenElse(_, g, s1, s2) => {
-                let it1 = bexp_numerals(g).into_iter();
+            Stm::AExp(_, _, e) | Stm::Ass(_, _, _, e) => e.numerals(),
+            Stm::BExp(_, _, e) => e.numerals(),
+            Stm::Skip(_, _) => BTreeSet::new(),
+            Stm::IfThenElse(_, _, g, s1, s2) => {
+                let it1 = g.numerals().into_iter();
                 let it2 = s1.get_numerals().into_iter();
                 let it3 = s2.get_numerals().into_iter();
                 it1.chain(it2).chain(it3).collect()
             }
-            Stm::While(_, g, s) => {
-                let it1 = bexp_numerals(g).into_iter();
+            Stm::While(_, _, g, s) => {
+                let it1 = g.numerals().into_iter();
                 let it2 = s.get_numerals().into_iter();
                 it1.chain(it2).collect()
             }
-            Stm::Comp(_, s1, s2) => {
+            Stm::Comp(s1, s2) => {
                 let it1 = s1.get_numerals().into_iter();
                 let it2 = s2.get_numerals().into_iter();
                 it1.chain(it2).collect()
@@ -309,14 +342,14 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
             let id = get_id();
             match pair.as_rule() {
                 Rule::stm => stm_ast(pair.into_inner()),
-                Rule::aexp => Stm::AExp(id, aexp_ast(pair.into_inner())),
-                Rule::bexp => Stm::BExp(id, bexp_ast(pair.into_inner())),
-                Rule::skip => Stm::Skip(id),
+                Rule::aexp => Stm::AExp(id, false, aexp_ast(pair.into_inner())),
+                Rule::bexp => Stm::BExp(id, false, bexp_ast(pair.into_inner())),
+                Rule::skip => Stm::Skip(id, false),
                 Rule::ass => {
                     let mut it = pair.into_inner();
                     let var = it.next().unwrap();
                     let exp = it.next().unwrap();
-                    Stm::Ass(id, var.as_str().into(), aexp_ast(exp.into_inner()))
+                    Stm::Ass(id, false, var.as_str().into(), aexp_ast(exp.into_inner()))
                 }
                 Rule::ifelse => {
                     let mut it = pair.into_inner();
@@ -325,6 +358,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                     let else_ = it.next().unwrap();
                     Stm::IfThenElse(
                         id,
+                        false,
                         bexp_ast(cond.into_inner()),
                         stm_ast(if_.into_inner()).into(),
                         stm_ast(else_.into_inner()).into(),
@@ -336,6 +370,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                     let body = it.next().unwrap();
                     Stm::While(
                         id,
+                        false,
                         bexp_ast(cond.into_inner()),
                         stm_ast(body.into_inner()).into(),
                     )
@@ -344,8 +379,25 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
             }
         })
         .map_infix(|lhs, op, rhs| match op.as_rule() {
-            Rule::comp => Stm::Comp(0, lhs.into(), rhs.into()),
+            Rule::comp => Stm::Comp(lhs.into(), rhs.into()),
             _ => unreachable!(),
+        })
+        .map_prefix(|op, rhs| {
+            fn make_wid(stm: Stm) -> Stm {
+                match stm {
+                    Stm::AExp(id, _, e) => Stm::AExp(id, true, e),
+                    Stm::BExp(id, _, e) => Stm::BExp(id, true, e),
+                    Stm::Ass(id, _, x, e) => Stm::Ass(id, true, x, e),
+                    Stm::Skip(id, _) => Stm::Skip(id, true),
+                    Stm::IfThenElse(id, _, g, e1, e2) => Stm::IfThenElse(id, true, g, e1, e2),
+                    Stm::While(id, _, g, e) => Stm::While(id, true, g, e),
+                    Stm::Comp(s1, s2) => Stm::Comp(make_wid(*s1).into(), s2),
+                }
+            }
+            match op.as_rule() {
+                Rule::wid => make_wid(rhs),
+                _ => unreachable!(),
+            }
         })
         .parse(pairs)
 }
@@ -393,19 +445,19 @@ fn fmt(stm: &Stm, i: usize) -> String {
     let x = "";
     let ii = i + 4;
     match stm {
-        Stm::AExp(_, aexp) => format!("{x:i$}{aexp}"),
-        Stm::BExp(_, bexp) => format!("{x:i$}{bexp}"),
-        Stm::Ass(_, var, aexp) => format!("{x:i$}{var} := {aexp}"),
-        Stm::Skip(_) => format!("{x:i$}skip"),
-        Stm::IfThenElse(_, g, stm1, stm2) => {
+        Stm::AExp(_, _, aexp) => format!("{x:i$}{aexp}"),
+        Stm::BExp(_, _, bexp) => format!("{x:i$}{bexp}"),
+        Stm::Ass(_, _, var, aexp) => format!("{x:i$}{var} := {aexp}"),
+        Stm::Skip(_, _) => format!("{x:i$}skip"),
+        Stm::IfThenElse(_, _, g, stm1, stm2) => {
             format!(
                 "{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
                 fmt(&stm1, ii),
                 fmt(&stm2, ii)
             )
         }
-        Stm::While(_, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
-        Stm::Comp(_, stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
+        Stm::While(_, _, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
+        Stm::Comp(stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
     }
 }
 

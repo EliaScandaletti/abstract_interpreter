@@ -12,7 +12,7 @@ use crate::{
         interval_interpreter::{IntervalDomain, IntervalInterpreter},
         AbstractInterpreter,
     },
-    syntax::Id,
+    syntax::Label,
 };
 
 extern crate pest;
@@ -36,11 +36,11 @@ fn main() {
     let nums = prog.get_numerals();
 
     let dlb = match nums.first() {
-        Some(n) => Limit::Num(n.clone()),
+        Some(n) => Limit::Num(n.clone() - 1),
         None => Limit::InfN,
     };
     let dub = match nums.last() {
-        Some(n) => Limit::Num(n.clone()),
+        Some(n) => Limit::Num(n.clone() + 1),
         None => Limit::InfP,
     };
     let v_dom = IntervalValueDomain::new(dlb, dub);
@@ -58,52 +58,45 @@ where
     AD: AbsDomain<AVD>,
     AD::State: Display,
 {
-    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Id, S>) -> (Id, Option<S>)
+    let AIResult { inv, exit_point } = inv;
+    let last_inv = inv.get(exit_point).unwrap();
+
+    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Label, S>) -> (Label, bool, S)
     where
         S: Clone + Display,
     {
-        let id = match stm {
-            Stm::AExp(id, _) => id,
-            Stm::BExp(id, _) => id,
-            Stm::Ass(id, _, _) => id,
-            Stm::Skip(id) => id,
-            Stm::IfThenElse(id, _, _, _) => id,
-            Stm::While(id, _, _) => id,
-            Stm::Comp(id, _, _) => id,
-        };
-        (*id, inv.get(id).cloned())
+        let id = stm.id();
+        let w = stm.is_widen();
+        (*id, w, inv.get(id).unwrap().clone())
     }
 
-    fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Id, S>, i: usize) -> String
+    fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Label, S>, i: usize) -> String
     where
         S: Clone + Display,
     {
         let x = "";
         let ii = i + 4;
-        let (id, s) = get_inv(stm, inv);
-        let ss = match s {
-            Some(s) => format!("{id}: {s}").purple(),
-            None => "".into(),
-        };
+        let (id, w, s) = get_inv(stm, inv);
+        let ss = format!("{id}{}: {s}", if w { "w" } else { " " }).purple();
         match stm {
-            Stm::AExp(_, aexp) => format!("{ss}\n{x:i$}{aexp}"),
-            Stm::BExp(_, bexp) => format!("{ss}\n{x:i$}{bexp}"),
-            Stm::Ass(_, var, aexp) => format!("{ss}\n{x:i$}{var} := {aexp}"),
-            Stm::Skip(_) => format!("{ss}\n{x:i$}skip"),
-            Stm::IfThenElse(_, g, stm1, stm2) => {
+            Stm::AExp(_, _, aexp) => format!("{ss}\n{x:i$}{aexp}"),
+            Stm::BExp(_, _, bexp) => format!("{ss}\n{x:i$}{bexp}"),
+            Stm::Ass(_, _, var, aexp) => format!("{ss}\n{x:i$}{var} := {aexp}"),
+            Stm::Skip(_, _) => format!("{ss}\n{x:i$}skip"),
+            Stm::IfThenElse(_, _, g, stm1, stm2) => {
                 format!(
                     "{ss}\n{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
                     print_nice(&stm1, inv, ii),
                     print_nice(&stm2, inv, ii),
                 )
             }
-            Stm::While(_, g, stm) => {
+            Stm::While(_, _, g, stm) => {
                 format!(
                     "{ss}\n{x:i$}while {g} do\n{}\n{x:i$}done",
                     print_nice(&stm, inv, ii),
                 )
             }
-            Stm::Comp(_, stm1, stm2) => {
+            Stm::Comp(stm1, stm2) => {
                 format!(
                     "{};\n{}",
                     print_nice(&stm1, inv, i),
@@ -113,6 +106,10 @@ where
         }
     }
 
-    let body = print_nice(prog, &inv.inv, 8);
-    format!("{body}\n{}", inv.last_inv.to_string().purple())
+    let i = 8;
+    let body = print_nice(prog, inv, i);
+    format!(
+        "{body}\n{}",
+        format!("{exit_point} : {last_inv}").purple().purple()
+    )
 }
