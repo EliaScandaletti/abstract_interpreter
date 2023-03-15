@@ -19,8 +19,8 @@ pub trait AbsValueDomain: Sized {
     fn top(&self) -> Self::Value;
     fn lub(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
     fn glb(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
-    // fn widening(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
-    // fn narrowing(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
+    fn widening(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
+    fn narrowing(&self, lhs: &Self::Value, rhs: &Self::Value) -> Self::Value;
     // fn gamma<T>(&self, val: &Self::Value) -> T;
     // fn alpha<T>(&self, val: T) -> Self::Value;
 }
