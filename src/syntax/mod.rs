@@ -172,59 +172,61 @@ impl BExp {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Meta {
+    pub id: Label,
+    pub widening: bool,
+    pub narrowing: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Stm {
-    AExp(Label, bool, AExp),
-    BExp(Label, bool, BExp),
-    Ass(Label, bool, Variable, AExp),
-    Skip(Label, bool),
-    IfThenElse(Label, bool, BExp, Box<Stm>, Box<Stm>),
-    While(Label, bool, BExp, Box<Stm>),
+    AExp(Meta, AExp),
+    BExp(Meta, BExp),
+    Ass(Meta, Variable, AExp),
+    Skip(Meta),
+    IfThenElse(Meta, BExp, Box<Stm>, Box<Stm>),
+    While(Meta, BExp, Box<Stm>),
     Comp(Box<Stm>, Box<Stm>),
 }
 
 impl Stm {
-    pub fn id(&self) -> &Label {
+    pub fn meta(&self) -> &Meta {
         match self {
-            Stm::AExp(id, _, _)
-            | Stm::BExp(id, _, _)
-            | Stm::Ass(id, _, _, _)
-            | Stm::Skip(id, _)
-            | Stm::IfThenElse(id, _, _, _, _)
-            | Stm::While(id, _, _, _) => id,
-            Stm::Comp(s1, _) => s1.id(),
+            Stm::AExp(meta, _)
+            | Stm::BExp(meta, _)
+            | Stm::Ass(meta, _, _)
+            | Stm::Skip(meta)
+            | Stm::IfThenElse(meta, _, _, _)
+            | Stm::While(meta, _, _) => meta,
+            Stm::Comp(s1, _) => s1.meta(),
         }
     }
+    pub fn id(&self) -> &Label {
+        &self.meta().id
+    }
 
-    pub fn is_widen(&self) -> bool {
-        match self {
-            Stm::AExp(_, w, _)
-            | Stm::BExp(_, w, _)
-            | Stm::Ass(_, w, _, _)
-            | Stm::Skip(_, w)
-            | Stm::IfThenElse(_, w, _, _, _)
-            | Stm::While(_, w, _, _) => *w,
-            Stm::Comp(s1, _) => s1.is_widen(),
-        }
+    pub fn widening(&self) -> bool {
+        self.meta().widening
     }
 
     pub fn get_vars(&self) -> BTreeSet<Variable> {
         match self {
-            Stm::AExp(_, _, e) => e.vars(),
-            Stm::BExp(_, _, e) => e.vars(),
-            Stm::Ass(_, _, x, e) => {
+            Stm::AExp(_, e) => e.vars(),
+            Stm::BExp(_, e) => e.vars(),
+            Stm::Ass(_, x, e) => {
                 let mut ret = e.vars();
                 ret.insert(x.clone());
                 ret
             }
-            Stm::Skip(_, _) => BTreeSet::new(),
-            Stm::IfThenElse(_, _, g, s1, s2) => {
+            Stm::Skip(_) => BTreeSet::new(),
+            Stm::IfThenElse(_, g, s1, s2) => {
                 let it1 = g.vars().into_iter();
                 let it2 = s1.get_vars().into_iter();
                 let it3 = s2.get_vars().into_iter();
                 it1.chain(it2).chain(it3).collect()
             }
-            Stm::While(_, _, g, s) => {
+            Stm::While(_, g, s) => {
                 let it1 = g.vars().into_iter();
                 let it2 = s.get_vars().into_iter();
                 it1.chain(it2).collect()
@@ -239,16 +241,16 @@ impl Stm {
 
     pub fn get_numerals(&self) -> BTreeSet<Numeral> {
         match self {
-            Stm::AExp(_, _, e) | Stm::Ass(_, _, _, e) => e.numerals(),
-            Stm::BExp(_, _, e) => e.numerals(),
-            Stm::Skip(_, _) => BTreeSet::new(),
-            Stm::IfThenElse(_, _, g, s1, s2) => {
+            Stm::AExp(_, e) | Stm::Ass(_, _, e) => e.numerals(),
+            Stm::BExp(_, e) => e.numerals(),
+            Stm::Skip(_) => BTreeSet::new(),
+            Stm::IfThenElse(_, g, s1, s2) => {
                 let it1 = g.numerals().into_iter();
                 let it2 = s1.get_numerals().into_iter();
                 let it3 = s2.get_numerals().into_iter();
                 it1.chain(it2).chain(it3).collect()
             }
-            Stm::While(_, _, g, s) => {
+            Stm::While(_, g, s) => {
                 let it1 = g.numerals().into_iter();
                 let it2 = s.get_numerals().into_iter();
                 it1.chain(it2).collect()
@@ -339,17 +341,21 @@ fn bexp_ast(pairs: Pairs<Rule>) -> BExp {
 fn stm_ast(pairs: Pairs<Rule>) -> Stm {
     STM_PARSER
         .map_primary(|pair| {
-            let id = get_id();
+            let meta = Meta {
+                id: get_id(),
+                widening: false,
+                narrowing: false,
+            };
             match pair.as_rule() {
                 Rule::stm => stm_ast(pair.into_inner()),
-                Rule::aexp => Stm::AExp(id, false, aexp_ast(pair.into_inner())),
-                Rule::bexp => Stm::BExp(id, false, bexp_ast(pair.into_inner())),
-                Rule::skip => Stm::Skip(id, false),
+                Rule::aexp => Stm::AExp(meta, aexp_ast(pair.into_inner())),
+                Rule::bexp => Stm::BExp(meta, bexp_ast(pair.into_inner())),
+                Rule::skip => Stm::Skip(meta),
                 Rule::ass => {
                     let mut it = pair.into_inner();
                     let var = it.next().unwrap();
                     let exp = it.next().unwrap();
-                    Stm::Ass(id, false, var.as_str().into(), aexp_ast(exp.into_inner()))
+                    Stm::Ass(meta, var.as_str().into(), aexp_ast(exp.into_inner()))
                 }
                 Rule::ifelse => {
                     let mut it = pair.into_inner();
@@ -357,8 +363,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                     let if_ = it.next().unwrap();
                     let else_ = it.next().unwrap();
                     Stm::IfThenElse(
-                        id,
-                        false,
+                        meta,
                         bexp_ast(cond.into_inner()),
                         stm_ast(if_.into_inner()).into(),
                         stm_ast(else_.into_inner()).into(),
@@ -369,8 +374,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                     let cond = it.next().unwrap();
                     let body = it.next().unwrap();
                     Stm::While(
-                        id,
-                        false,
+                        meta,
                         bexp_ast(cond.into_inner()),
                         stm_ast(body.into_inner()).into(),
                     )
@@ -384,13 +388,15 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
         })
         .map_prefix(|op, rhs| {
             fn make_wid(stm: Stm) -> Stm {
+                let mut meta = stm.meta().clone();
+                meta.widening = true;
                 match stm {
-                    Stm::AExp(id, _, e) => Stm::AExp(id, true, e),
-                    Stm::BExp(id, _, e) => Stm::BExp(id, true, e),
-                    Stm::Ass(id, _, x, e) => Stm::Ass(id, true, x, e),
-                    Stm::Skip(id, _) => Stm::Skip(id, true),
-                    Stm::IfThenElse(id, _, g, e1, e2) => Stm::IfThenElse(id, true, g, e1, e2),
-                    Stm::While(id, _, g, e) => Stm::While(id, true, g, e),
+                    Stm::AExp(_, e) => Stm::AExp(meta, e),
+                    Stm::BExp(_, e) => Stm::BExp(meta, e),
+                    Stm::Ass(_, x, e) => Stm::Ass(meta, x, e),
+                    Stm::Skip(_) => Stm::Skip(meta),
+                    Stm::IfThenElse(_, g, e1, e2) => Stm::IfThenElse(meta, g, e1, e2),
+                    Stm::While(_, g, e) => Stm::While(meta, g, e),
                     Stm::Comp(s1, s2) => Stm::Comp(make_wid(*s1).into(), s2),
                 }
             }
@@ -445,18 +451,18 @@ fn fmt(stm: &Stm, i: usize) -> String {
     let x = "";
     let ii = i + 4;
     match stm {
-        Stm::AExp(_, _, aexp) => format!("{x:i$}{aexp}"),
-        Stm::BExp(_, _, bexp) => format!("{x:i$}{bexp}"),
-        Stm::Ass(_, _, var, aexp) => format!("{x:i$}{var} := {aexp}"),
-        Stm::Skip(_, _) => format!("{x:i$}skip"),
-        Stm::IfThenElse(_, _, g, stm1, stm2) => {
+        Stm::AExp(_, aexp) => format!("{x:i$}{aexp}"),
+        Stm::BExp(_, bexp) => format!("{x:i$}{bexp}"),
+        Stm::Ass(_, var, aexp) => format!("{x:i$}{var} := {aexp}"),
+        Stm::Skip(_) => format!("{x:i$}skip"),
+        Stm::IfThenElse(_, g, stm1, stm2) => {
             format!(
                 "{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
                 fmt(&stm1, ii),
                 fmt(&stm2, ii)
             )
         }
-        Stm::While(_, _, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
+        Stm::While(_, g, stm) => format!("{x:i$}while {g} do\n{}\n{x:i$}done", fmt(&stm, ii)),
         Stm::Comp(stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
     }
 }

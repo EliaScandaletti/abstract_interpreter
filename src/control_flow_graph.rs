@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::syntax::{AExp, BExp, Label, Stm, Variable};
+use crate::syntax::{AExp, BExp, Label, Meta, Stm, Variable};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Command {
@@ -43,11 +43,15 @@ impl ControlFlowGraph {
 
     pub fn new(ast: &Stm) -> Self {
         match ast {
-            Stm::AExp(id, w, _)
-            | Stm::BExp(id, w, _)
-            | Stm::Ass(id, w, _, _)
-            | Stm::Skip(id, w) => {
-                let wid_pts = if *w { [*id].into() } else { BTreeSet::new() };
+            Stm::AExp(Meta { id, widening, .. }, _)
+            | Stm::BExp(Meta { id, widening, .. }, _)
+            | Stm::Ass(Meta { id, widening, .. }, _, _)
+            | Stm::Skip(Meta { id, widening, .. }) => {
+                let wid_pts = if *widening {
+                    [*id].into()
+                } else {
+                    BTreeSet::new()
+                };
 
                 let entry_point = *id;
                 let exit_point = id + 1;
@@ -55,10 +59,10 @@ impl ControlFlowGraph {
                 let labels = [entry_point, exit_point].into();
 
                 let comm = match ast {
-                    Stm::AExp(_, _, aexp) => Command::AExp(aexp.clone()),
-                    Stm::BExp(_, _, bexp) => Command::BExp(bexp.clone()),
-                    Stm::Ass(_, _, var, val) => Command::Ass(var.clone(), val.clone()),
-                    Stm::Skip(_, _) => Command::Skip,
+                    Stm::AExp(_, aexp) => Command::AExp(aexp.clone()),
+                    Stm::BExp(_, bexp) => Command::BExp(bexp.clone()),
+                    Stm::Ass(_, var, val) => Command::Ass(var.clone(), val.clone()),
+                    Stm::Skip(_) => Command::Skip,
                     _ => unreachable!(),
                 };
                 let arcs = BTreeMap::from([((*id, exit_point), comm)]);
@@ -72,11 +76,11 @@ impl ControlFlowGraph {
                 }
             }
 
-            Stm::IfThenElse(id, w, g, stm1, stm2) => {
+            Stm::IfThenElse(Meta { id, widening, .. }, g, stm1, stm2) => {
                 let g1 = Self::new(&stm1);
                 let g2 = Self::new(&stm2);
 
-                let wid_pts = if *w { vec![*id] } else { vec![] }
+                let wid_pts = if *widening { vec![*id] } else { vec![] }
                     .into_iter()
                     .chain(g1.wid_pts.into_iter())
                     .chain(g2.wid_pts.into_iter())
@@ -113,7 +117,7 @@ impl ControlFlowGraph {
                 }
             }
 
-            Stm::While(id, w, g, stm) => {
+            Stm::While(Meta { id, widening, .. }, g, stm) => {
                 let gr = Self::new(&stm);
 
                 let entry_point = *id;
@@ -124,7 +128,7 @@ impl ControlFlowGraph {
                     .chain(gr.labels.into_iter())
                     .collect();
 
-                let wid_pts = if *w { vec![*id] } else { vec![] }
+                let wid_pts = if *widening { vec![*id] } else { vec![] }
                     .into_iter()
                     .chain(gr.wid_pts.into_iter())
                     .collect();
