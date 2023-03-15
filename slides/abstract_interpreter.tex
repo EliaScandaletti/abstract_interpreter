@@ -2,6 +2,8 @@
 % \documentclass{article}
 % \usepackage{beamerarticle}
 
+\usepackage{mathtools}
+\usepackage{stmaryrd}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,arrows}
 \usetikzlibrary{positioning}
@@ -10,10 +12,34 @@
 \setbeamercovered{transparent} 
 \usefonttheme[onlymath]{serif}
 
+\newcommand{\While}{\textbf{While}}
+\newcommand{\ExtWhile}{\textbf{While}\ensuremath{^{\mbox{\footnotesize ext}}}}
+\newcommand{\Num}{\textbf{Num}}
+\newcommand{\Var}{\textbf{Var}}
+\newcommand{\Aexp}{\textbf{Aexp}}
+\newcommand{\Bexp}{\textbf{Bexp}}
+\newcommand{\Stm}{\textbf{Stm}}
+\newcommand{\State}{\textbf{State}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\T}{\textbf{T}}
+\newcommand{\true}{\texttt{true}}
+\newcommand{\false}{\texttt{false}}
+\newcommand{\sskip}{\texttt{skip}}
+\newcommand{\ifelse}[3]{\mathtt{if}\ #1\ \mathtt{then}\ #2\ \mathtt{else}\ #3\ \mathtt{endif}}
+\newcommand{\while}[2]{\mathtt{while}\ #1\ \mathtt{do}\ #2\ \mathtt{done}}
+\newcommand{\sem}[2]{\mathcal{#1} \llbracket #2 \rrbracket}
+\newcommand{\tr}{\mathbf{tt}}
+\newcommand{\ff}{\mathbf{ff}}
+\newcommand{\undefined}{\uparrow}
+\newcommand{\defined}{\!\downarrow}
+
+\newcommand{\Intmn}{\textrm{I}_{\textrm{m,n}}}
+\newcommand{\bound}{\textrm{bound}_{\textrm{m,n}}}
+
 \title{Implementation of Abstract Interpreter}
 \subtitle{Software Verification Course Homework}
 \author[E. Scandaletti]{Elia Scandaletti\texorpdfstring{ - 2087934\\University of Padova}{}}
-\date[13/02/2023]{13th February 2023}
+\date[13/02/2023]{16th March 2023}
 
 \begin{document}
 \begin{frame}
@@ -44,6 +70,249 @@
 
     ~\\
     We will see each of them in detail.
+
+\end{frame}
+
+\section{Extended While Language}
+
+\begin{frame}{Extended While Syntax}
+
+    \begin{align*}
+        \mbox{\Aexp: }
+        a \Coloneq    & \ n
+        \ |\ x
+        \ |\ a_1 + a_2
+        \ |\ a_1 * a_2
+        \ |\ a_1 - a_2                     \\
+        \ |\          & a_1 \div a_2
+        \ |\ x+\!+
+        \ |\ +\!+x
+        \ |\ x-\!-
+        \ |\ -\!-x
+        \\
+        \mbox{\Bexp: }
+        b \Coloneq    & \ \true
+        \ |\ \false
+        \ |\ \neg b
+        \ |\ b_1 \wedge b_2
+        \ |\ a_1 = a_2
+        \ |\ a_1 \leq a_2
+        \\
+        \mbox{\Stm: }
+        S \Coloneq    & \ x \coloneq a
+        \ |\ \sskip
+        \ |\ S_1; S_2
+        \ |\ \ifelse{b}{S_1}{S_2}          \\
+        \ |\          & \while{b}{S}
+        \ |\ a
+        \ |\ b
+        \ |\ \alert{[spec]} S
+        \\
+        spec \Coloneq & \ \mathtt{w}\ spec
+        \ |\ \mathtt{n}\ spec
+    \end{align*}
+
+    $n \in \mathbf{Num}$ is a string of decimal digits.
+
+    $x \in \mathbf{Var}$ is a string of alphabetical ASCII characters.
+
+    ~\\
+    $[spec]$ is used to specify the set of points used for widening or narrowing.
+
+\end{frame}
+
+\begin{frame}{Extended While Concrete Semantics}{State Changing Arithmetic Expressions}
+
+    $$\mathcal{S_A} : \Aexp \to \State \to \State$$
+    \begin{gather*}
+        \begin{aligned}
+            \sem{S_A}{n}      & = \mathrm{id}         &
+            \sem{S_A}{x}      & = \mathrm{id}           \\
+            \sem{S_A}{x+\!+}s & = s[x \mapsto s\;x+1] &
+            \sem{S_A}{x-\!-}s & = s[x \mapsto s\;x-1]   \\
+            \sem{S_A}{+\!+x}s & = s[x \mapsto s\;x+1] &
+            \sem{S_A}{-\!-x}s & = s[x \mapsto s\;x-1]   \\
+        \end{aligned} \\
+        \begin{aligned}
+            \forall \star \in \{+, -, *, \div\}\
+            \sem{S_A}{a_1 \star a_2} & = \sem{S_A}{a_2} \circ \sem{S_A}{a_1}
+        \end{aligned}
+    \end{gather*}
+
+\end{frame}
+
+\begin{frame}{Extended While Concrete Semantics}{Value of Arithmetic expressions}
+
+    $$\mathcal{V_A} : \Aexp \to \State \hookrightarrow \Z$$
+    \begin{gather*}
+        \begin{aligned}
+            \sem{V_A}{n}s     & = \sem{N}{n} &
+            \sem{V_A}{x}s     & = s\;x         \\
+            \sem{V_A}{x+\!+}s & = s\;x       &
+            \sem{V_A}{x-\!-}s & = s\;x         \\
+            \sem{V_A}{+\!+x}s & = s\;x+1     &
+            \sem{V_A}{-\!-x}s & = s\;x-1
+        \end{aligned} \\
+        \begin{aligned}
+            \sem{V_A}{a_1 \star a_2}s & =
+            \begin{cases}
+                z_1 \star z_2,
+                 & \mbox{if } \sem{V_A}{a_1}s \defined = z_1 \wedge \sem{S_A}{a_1}s = s' \\
+                 & \wedge \sem{V_A}{a_2}s' \defined = z_2                                \\
+                \undefined,
+                 & \mbox{otherwise}
+            \end{cases} \\
+            \sem{V_A}{a_1 \div a_2}s  & =
+            \begin{cases}
+                z_1 \div z_2,
+                 & \mbox{if } \sem{V_A}{a_1}s \defined = z_1 \wedge \sem{S_A}{a_1}s = s' \\
+                 & \wedge \sem{V_A}{a_2}s' \defined = z_2 \neq 0                         \\
+                \undefined,
+                 & \mbox{otherwise}
+            \end{cases}
+        \end{aligned}
+    \end{gather*}
+
+\end{frame}
+
+\begin{frame}{Extended While Concrete Semantics}{State Changing Boolean Expressions}
+
+    $$\mathcal{S_B} : \Bexp \to \State \to \State$$
+    \begin{align*}
+        \sem{S_B}{\true}          & = \mathrm{id}                         \\
+        \sem{S_B}{\false}         & = \mathrm{id}                         \\
+        \sem{S_B}{\neg b}         & = \sem{S_B}{b}                        \\
+        \sem{S_B}{b_1 \wedge b_2} & = \sem{S_B}{b_2} \circ \sem{S_B}{b_1} \\
+        \sem{S_B}{a_1 = a_2}      & = \sem{S_A}{a_2} \circ \sem{S_A}{a_1} \\
+        \sem{S_B}{a_1 \leq a_2}   & = \sem{S_A}{a_2} \circ \sem{S_A}{a_1}
+    \end{align*}
+
+\end{frame}
+
+\begin{frame}{Extended While Concrete Semantics}{Value of Boolean Expressions}
+
+    $$\mathcal{V_B} : \Bexp \to \State \hookrightarrow \T$$
+    \begin{overprint}
+        \onslide<1>
+        \begin{gather*}
+            \begin{aligned}
+                \sem{V_B}{\true}s  & = \tr &
+                \sem{V_B}{\false}s & = \ff   \\
+            \end{aligned} \\
+            \sem{V_B}{\neg b}s =
+            \begin{cases}
+                \tr,        & \mbox{if } \sem{V_B}{b}s \defined = \ff \\
+                \ff,        & \mbox{if } \sem{V_B}{b}s \defined = \tr \\
+                \undefined, & \mbox{otherwise}
+            \end{cases}
+        \end{gather*}
+
+        \onslide<2>
+        \begin{equation*}
+            \sem{V_B}{b_1 \wedge b_2}s =
+            \begin{cases}
+                \tr,
+                 & \mbox{if } s' = \sem{S_B}{b_1}s \;\wedge                   \\
+                 & \sem{V_B}{b_1}s \defined = \sem{V_B}{b_2}s' \defined = \tr \\
+                \ff,
+                 & \mbox{else if } s' = \sem{S_B}{b_1}s \;\wedge              \\
+                 & \sem{V_B}{b_1}s \defined \wedge \sem{V_B}{b_2}s' \defined  \\
+                \undefined,
+                 & \mbox{otherwise}
+            \end{cases}
+        \end{equation*}
+
+        \onslide<3>
+        \begin{equation*}
+            \sem{V_B}{a_1 = a_2}s =
+            \begin{cases}
+                \tr,
+                 & \mbox{if } s' = \sem{S_A}{a_1}s \;\wedge                  \\
+                 & \sem{V_A}{a_1}s \defined \;= \sem{V_A}{a_2}s' \defined    \\
+                \ff,
+                 & \mbox{else if } s' = \sem{S_A}{a_1}s \;\wedge             \\
+                 & \sem{V_A}{a_1}s \defined \wedge \sem{V_A}{a_2}s' \defined \\
+                \undefined,
+                 & \mbox{otherwise}
+            \end{cases}
+        \end{equation*}
+
+        \onslide<4>
+        \begin{equation*}
+            \sem{V_B}{a_1 \leq a_2}s =
+            \begin{cases}
+                \tr,
+                 & \mbox{if } s' = \sem{S_A}{a_1}s \;\wedge                  \\
+                 & \sem{V_A}{a_1}s \defined \;\leq \sem{V_A}{a_2}s' \defined \\
+                \ff,
+                 & \mbox{else if } s' = \sem{S_A}{a_1}s \;\wedge             \\
+                 & \sem{V_A}{a_1}s \defined \wedge \sem{V_A}{a_2}s' \defined \\
+                \undefined,
+                 & \mbox{otherwise}
+            \end{cases}
+        \end{equation*}
+    \end{overprint}
+
+\end{frame}
+
+\begin{frame}{Denotational Semantics}{Semantic Function}
+
+    $$\mathcal{S}_{\mathrm{ds}}: \Stm \to \State \hookrightarrow \State$$
+    \begin{overprint}
+        \onslide<1>
+        \begin{align*}
+            \sem{S_{\mathrm{ds}}}{x \coloneq a}s & =
+            (\mathrm{set}(x, \sem{V_A}{a}s) \circ \sem{S_\mathrm{ds}}{a})s \\
+            \mbox{where } \mathrm{set}(x, z)\;s  & =
+            \begin{cases}
+                s[x \mapsto z], & \mbox{if } z\defined \\
+                \undefined,     & \mbox{otherwise}
+            \end{cases}                         \\
+            \sem{S_{\mathrm{ds}}}{\sskip}        & =
+            \mathrm{id}                                                    \\
+            \sem{S_{\mathrm{ds}}}{S_1; S_2}      & =
+            \sem{S_{\mathrm{ds}}}{S_2} \circ \sem{S_{\mathrm{ds}}}{S_1}    \\
+            \sem{S_{\mathrm{ds}}}{a}             & =
+            \sem{S_A}{a}                                                   \\
+            \sem{S_{\mathrm{ds}}}{b}             & =
+            \sem{S_B}{b}
+        \end{align*}
+
+        \onslide<2>
+        \begin{gather*}
+            \begin{multlined}[][0.8\textwidth]
+                \sem{S_{\mathrm{ds}}}{\ifelse{b}{S_1}{S_2}} = \\
+                \mathrm{cond}(\sem{V_B}{b}, \sem{S_\mathrm{ds}}{b}, \sem{S_{\mathrm{ds}}}{S_1}, \sem{S_{\mathrm{ds}}}{S_2})
+            \end{multlined} \\
+            \mbox{where } \mathrm{cond}(p, g_0, g_1, g_2)\;s =
+            \begin{cases}
+                g_1\;(g_0\;s), & \mbox{if } p\;s\defined = \tr \\
+                g_2\;(g_0\;s), & \mbox{if } p\;s\defined = \ff \\
+                \bot,          & \mbox{otherwise}
+            \end{cases}
+        \end{gather*}
+        Note that the functionality of $\mathrm{cond}$ is:
+        \begin{multline*}
+            (\State \hookrightarrow \T) \times (\State \hookrightarrow \State) \times \\
+            (\State \hookrightarrow \State) \times (\State \hookrightarrow \State) \to (\State \hookrightarrow \State)
+        \end{multline*}
+
+        \onslide<3>
+        \begin{align*}
+            \sem{S_{\mathrm{ds}}}{\while{b}{S}} & =
+            \mathrm{FIX}\;F                         \\
+            \mbox{where } F\;g                  & =
+            \mathrm{cond}(\sem{V_B}{b}, \sem{S_\mathrm{ds}}{b}, g \circ \sem{S_{\mathrm{ds}}}{S},\mathrm{id})
+        \end{align*}
+
+        This comes from the semantic equivalence
+        \begin{multline*}
+            \sem{S_{\mathrm{ds}}}{\while{b}{S}} \\
+            = \sem{S_{\mathrm{ds}}}{\ifelse{b}{(S; \while{b}{S})}{\sskip}} \\
+            = \mathrm{cond}(\sem{V_B}{b}, \sem{S_\mathrm{ds}}{b}, \sem{S_{\mathrm{ds}}}{S; \while{b}{S}},\mathrm{id}) \\
+            = \mathrm{cond}(\sem{V_B}{b}, \sem{S_\mathrm{ds}}{b}, \sem{S_{\mathrm{ds}}}{\while{b}{S}} \circ \sem{S_{\mathrm{ds}}}{S},\mathrm{id})
+        \end{multline*}
+    \end{overprint}
 
 \end{frame}
 
@@ -105,7 +374,7 @@
         \item \texttt{Eq(\textit{a1}, \textit{a2})} $\sim$ \texttt{\textit{a1} = \textit{a2}};
         \item \texttt{Neq(\textit{a1}, \textit{a2})} $\sim$ \texttt{\textit{a1} != \textit{a2}};
         \item \texttt{Lt(\textit{a1}, \textit{a2})} $\sim$ \texttt{\textit{a1} < \textit{a2}};
-        \item \texttt{And(\textit{b1}, \textit{b2})} $\sim$  \texttt{\textit{b1} \&\& \textit{b2}};
+        \item \texttt{And(\textit{b1}, \textit{b2})} $\sim$ \texttt{\textit{b1} \&\& \textit{b2}};
         \item \texttt{Or(\textit{b1}, \textit{b2})} $\sim$ \texttt{\textit{b1} || \textit{b2}};
         \item \texttt{Not(\textit{b})} $\sim$ \texttt{!\textit{b}}.
     \end{itemize}
@@ -116,18 +385,18 @@
 
     Statements have multiple variants:
     \begin{itemize}
-        \item \texttt{AExp(id, \textit{a})} $\sim$ \textit{a}, result is ignored;
-        \item \texttt{BExp(id, \textit{b})} $\sim$ \textit{b}, result is ignored;
-        \item \texttt{Ass(id, \textit{x}, \textit{a})} $\sim$ \texttt{\textit{x} := \textit{a}};
-        \item \texttt{Skip(id)} $\sim$ \texttt{skip};
-        \item \texttt{IfThenElse(id, \textit{b}, \textit{stm}1, \textit{stm}2)} $\sim$ \\
-              \hskip 1.5cm \texttt{if \textit{b} then \textit{stm}1 else \textit{stm}2 endif};
-        \item \texttt{While(id, \textit{b}, \textit{stm})} $\sim$ \texttt{while \textit{b} do \textit{stm} done};
-        \item \texttt{Comp(\_, \textit{stm}1, \textit{stm}2)} $\sim$ \texttt{\textit{stm}1; \textit{stm}2}.
+        \item \texttt{AExp(meta, \textit{a})} $\sim$ \textit{a}, result is ignored;
+        \item \texttt{BExp(meta, \textit{b})} $\sim$ \textit{b}, result is ignored;
+        \item \texttt{Ass(meta, \textit{x}, \textit{a})} $\sim$ \texttt{\textit{x} := \textit{a}};
+        \item \texttt{Skip(meta)} $\sim$ \sskip;
+        \item \texttt{IfThenElse(meta, \textit{b}, $stm_1$, $stm_2$)} $\sim$ \\
+              \hskip 1.5cm $\ifelse{\textit{b}}{stm_1}{stm_2}$;
+        \item \texttt{While(meta, \textit{b}, $stm$)} $\sim$ \texttt{while \textit{b} do $stm$ done};
+        \item \texttt{Comp($stm_1$, $stm_2$)} $\sim$ \texttt{$stm_1$; \textit{stm}2}.
     \end{itemize}
 
     ~\\
-    Note that all the statements - except \texttt{Comp} -  have an id which will be used in the end for mapping the nodes in the graph to the statements.
+    Note that all the statements - except \texttt{Comp} - have a \texttt{meta} field which contains some useful information: the label of the node just before the statement and whether it is a widening and/or narrowing point.
 
 \end{frame}
 
@@ -222,49 +491,160 @@
 
 \end{frame}
 
-\section{Abstract Domain}
+\section{Abstract Value Domain}
 
-\begin{frame}{Bounded Intervals}
+\begin{frame}{Abstract Value Domain}
 
-    Tha abstract domain is similar to the interval abstract domain.
-    The only difference is that any value above or below two given thresholds are considered respectively $+\inf$ or $-\inf$.
-
-    Furthermore, this domain can also represents constant values.
-
-    \begin{multline*}
-        \textrm{Int}_{m,n} = \{ \emptyset, \mathbb{Z} \}
-        \cup \{ [a, b], [a, b] \subseteq [m, n] \}
-        \cup \{ [k, k], k \in \mathbb{Z} \} \\
-        \cup \{ (-\inf, k], k \in [m, n] \}
-        \cup \{ [k, +\inf), k \in [m, n] \}
-    \end{multline*}
-
-    ~\\
-    In the implementation, the empty element is represented as a special value of the interval.
-    $\mathbb{Z}$, instead, is represented as the interval $(-\inf, +\inf)$.
+    Trait \texttt{AbsValueDomain} requires:
+    \begin{itemize}
+        \item associated type \texttt{Value};
+        \item method \texttt{value\_from\_num} to convert a numeral into a \texttt{Value};
+        \item method \texttt{cmp} to compare \texttt{Value}s;
+        \item methods \texttt{neg}, \texttt{add}, \texttt{sub}, \texttt{mul} and \texttt{div} to perform arithmetic operations on \texttt{Value}s;
+        \item methods \texttt{top} and \texttt{bot} which return the top and bottom elements of the domain;
+        \item methods \texttt{lub} and \texttt{glb} to perform the corresponding operations;
+        \item methods \texttt{widening} and \texttt{narrowing} to perform the corresponding operations.
+    \end{itemize}
 
 \end{frame}
 
-\begin{frame}{$\textrm{Int}_{m,n}$ Lattice}
+\begin{frame}{Interval Domain}
 
-    The $\textrm{Int}_{m,n}$ lattice is very similar to the interval lattice.
-    In fact, it is a subset.
+    \begin{overprint}
+        \onslide<1>
+        \begin{block}{\texttt{Value}}
+            \begin{multline*}
+                \Intmn = \{ \emptyset, \mathbb{Z} \}
+                \cup \{ [a, b]\, |\, [a, b] \subseteq [m, n] \}
+                \cup \{ [k, k]\, |\, k \in \mathbb{Z} \} \\
+                \cup \{ (-\inf, k]\, |\, k \in [m, n] \}
+                \cup \{ [k, +\inf)\, |\, k \in [m, n] \}
+            \end{multline*}
+            The empty element is represented as the special value \texttt{Bot}.
 
-    ~\\
+            $\mathbb{Z}$ is represented as the interval $(-\inf, +\inf)$.
+        \end{block}
 
-    The ordering is given by interval inclusion.
+        \onslide<2>
+        \begin{block}{Conversion from interval}
+            $$\bound : \cal{B}^\# \to \Intmn $$
+            $$
+                \bound\ [a,b] =
+                \begin{cases}
+                    \bot^\#_{\Intmn}, & \mbox{if } a > b                 \\
+                    \top^\#_{\Intmn}, & \mbox{if } a < m \wedge b > n    \\
+                    [a, b],           & \mbox{if } a = b                 \\
+                    [-\inf, b],       & \mbox{if } a < m \wedge b \leq n \\
+                    [a, +\inf],       & \mbox{if } b > n \wedge a \geq m
+                \end{cases}
+            $$
+        \end{block}
 
-    The top element is $(-\inf, +\inf)$.
-    The bottom element is $\emptyset$.
+        \onslide<3>
+        \begin{block}{POSet operators}
+            $$
+                [a,b] \sqsubseteq_{\Intmn} [c,d] \iff a \geq c \wedge b \leq d
+            $$
+            $$
+                \top^\#_{\Intmn} = \left] \textrm{-inf}, \textrm{+inf} \right[
+            $$
+            $$
+                [a,b] \cup^\#_{\Intmn} [c,d] = \bound\ [\min(a,c), \max(b,d)]
+            $$
+            $$
+                [a,b] \cap^\#_{\Intmn} [c,d] = \bound\ [\max(a,c), \min(b,d)]
+            $$
+        \end{block}
 
-    The lub of two intervals is the smallest interval that includes both of them.
+        \onslide<4>
+        \begin{block}{Arithmetic operators}
+            \begin{align*}
+                -^\#_{\Intmn}[a,b]        & = \bound\ [-b, -a]   \\
+                [a,b] +^\#_{\Intmn} [c,d] & = \bound\ [a+c,b+d]  \\
+                [a,b] -^\#_{\Intmn} [c,d] & = \bound\ [a-d, b-c] \\
+            \end{align*}
+            \vspace{-3em}
+            \begin{gather*}
+                [a,b] \times^\#_{\Intmn} [c,d] = \bound\ \min(ac, ad, bc, bd), \max(ac, ad, bc, bd)] \\
+                [a,b] /^\#_{\Intmn} [c,d] = \bound\
+                \begin{cases}
+                    [\min(a/c, a/d), \max(b/c, b/d)], \mbox{if } 1 \leq c  \\
+                    [\min(b/c, b/d), \max(a/c, a/d)], \mbox{if } d \leq -1 \\
+                    \begin{gathered}
+                        ([a,b] /^\#_{\Intmn} ([c,d] \cap^\#_{\Intmn} [1,+\inf])) \\
+                        \cup^\#_{\Intmn} \\
+                        ([a,b] /^\#_{\Intmn} ([c,d] \cap^\#_{\Intmn} [-\inf,-1]))
+                    \end{gathered}, \mbox{otherwise}
+                \end{cases}
+            \end{gather*}
+        \end{block}
 
-    The glb of two intervals is the intersection of the two.
+        \onslide<5>
+        \begin{block}{Widening}
+            $$
+                \bot^\#_{\Intmn} \nabla_{\Intmn} X^\# = X^\#
+            $$
+            $$
+                [a,b]\ \nabla_{\Intmn}\ [c,d] = \bound\ \left[
+                    \begin{cases}
+                        a,     & \mbox{if } a \leq c \\
+                        -\inf, & \mbox{otherwise}
+                    \end{cases},
+                    \begin{cases}
+                        b,     & \mbox{if } b \geq d \\
+                        +\inf, & \mbox{otherwise}
+                    \end{cases}
+                    \right]
+            $$
+        \end{block}
+        \begin{block}{Narrowing}
+            $$
+                [a,b]\ \Delta_{\Intmn}\ [c,d] = \bound\ \left[
+                    \begin{cases}
+                        c, & \mbox{if } a = -\inf \\
+                        a, & \mbox{otherwise}
+                    \end{cases},
+                    \begin{cases}
+                        d, & \mbox{if } b = +\inf \\
+                        b, & \mbox{otherwise}
+                    \end{cases}
+                    \right]
+            $$
+        \end{block}
+    \end{overprint}
 
-    ~\\
+\end{frame}
 
-    The abstract operations on $\textrm{Int}_{m,n}$ are defined as the operations on intervals.
-    The only difference is that if a result is outside the $\textrm{Int}_{m,n}$ domain, either or both the lower and upper bound of the interval are set to $\pm \inf$.
+\section{Abstract State Domain}
+
+\begin{frame}{Abstract State Domain}
+
+    Trait \texttt{AbsDomain<AVD>} requires:
+    \begin{itemize}
+        \item the type parameter \texttt{AVD} must satisfy the \texttt{AbsValueDomain} trait;
+        \item associated type \texttt{State};
+        \item method \texttt{value\_domain} returning a copy of the abstract value domain used;
+        \item methods \texttt{ass} and \texttt{get\_var} to assign and retrieve the abstract value of a variable in a given state;
+        \item methods \texttt{bot}, \texttt{top} to get the bottom and the top elements of the domain;
+        \item methods \texttt{lub}, \texttt{glb}, \texttt{widening} and \texttt{narrowing} to perform the respective operations.
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Non Relational Domain}
+
+    The \texttt{NonRelationalDomain<AVD>} structure implements the \texttt{AbsDomain<AVD>} trait.
+    \begin{itemize}
+        \item type \texttt{State} is either a special value \texttt{Bot} or a \texttt{Variable} to \texttt{AVD::Value} map;
+              \begin{itemize}
+                  \item invariant of \texttt{State}: if a stored variable has value bottom, the whole state becomes \texttt{Bot};
+              \end{itemize}
+        \item method \texttt{value\_domain} returns a copy of the abstract value domain stored in a private field;
+        \item methods \texttt{ass} and \texttt{get\_var} write to and read from the given state;
+        \item methods \texttt{bot} returns a state with vale \texttt{Bot};
+        \item \texttt{top} returns a state with a map where all stored variables have value top;
+        \item \texttt{lub}, \texttt{glb}, \texttt{widening} and \texttt{narrowing} are performed variable wise.
+    \end{itemize}
 
 \end{frame}
 
@@ -346,7 +726,7 @@
 
 \begin{frame}{Abstract Execution}{Boolean Expressions - Expression Tree}
 
-    \texttt{x := [2, 5]}
+    \texttt{x := \alt<5->{[3, 5]}{[2, 5]}}
 
     \texttt{2 * (++x) - (x++) > 5}
 
@@ -410,6 +790,227 @@
         \item if its invariant changed, it puts all the points that directly depends on it in the queue;
         \item if the queue is not empty, go to point 3, else finished.
     \end{enumerate}
+
+\end{frame}
+
+\section*{Examples}
+
+\begin{frame}{Example with Widening}
+
+    \begin{columns}[T]
+        \begin{column}{0.4\textwidth}
+            \begin{tikzpicture}
+                \begin{scope}[every node/.style={circle, draw}]
+                    \node (1) at (2, 4.5) {1};
+                    \node (2) at (2, 2) {2};
+                    \node (3) at (0, 0) {3};
+                    \node (4) at (3.5, 0) {4};
+                \end{scope}
+
+                \begin{scope}[>={Stealth[black]},
+                    every node/.style={fill=white}
+                    ]
+                    \path [->] (1) edge node{\texttt{x := 0}} (2);
+                    \path [->] (2) edge[bend right=45] node{\texttt{x < 40}} (3);
+                    \path [->] (2) edge node{\texttt{x $\geq$ 40}} (4);
+                    \path [->] (3) edge[bend right=45] node{\texttt{x := x+1}} (2);
+                \end{scope}
+            \end{tikzpicture}
+        \end{column}
+        \begin{column}{0.4\textwidth}
+
+            \begin{overprint}
+                \onslide<1>
+                Iteration: 1
+
+                Queue: [2, 3, 4]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = \bot^\#_{\Intmn}$
+                    \item ${\cal{X}}_3 = \bot^\#_{\Intmn}$
+                    \item ${\cal{X}}_4 = \bot^\#_{\Intmn}$
+                \end{itemize}
+
+                \onslide<2>
+                Iteration: 2
+
+                Queue: [3, 4]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = \alert{x \in [0, 0]}$
+                    \item ${\cal{X}}_3 = \bot^\#_{\Intmn}$
+                    \item ${\cal{X}}_4 = \bot^\#_{\Intmn}$
+                \end{itemize}
+
+                \onslide<3>
+                Iteration: 3
+
+                Queue: [4, 2]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = x \in [0, 0]$
+                    \item ${\cal{X}}_3 = \alert{x \in [0, 0]}$
+                    \item ${\cal{X}}_4 = \bot^\#_{\Intmn}$
+                \end{itemize}
+
+                \onslide<4>
+                Iteration: 4
+
+                Queue: [2]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = x \in [0, 0]$
+                    \item ${\cal{X}}_3 = x \in [0, 0]$
+                    \item ${\cal{X}}_4 = \bot^\#_{\Intmn}$
+                \end{itemize}
+
+                \onslide<5>
+                Iteration: 5
+
+                Queue: [3, 4]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = x \in [0, \alert{+\inf}]$
+                    \item ${\cal{X}}_3 = x \in [0, 0]$
+                    \item ${\cal{X}}_4 = \bot^\#_{\Intmn}$
+                \end{itemize}
+
+
+                \onslide<6>
+                Iteration: 6
+
+                Queue: [4, 2]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = x \in [0, +\inf]$
+                    \item ${\cal{X}}_3 = x \in [0, \alert{39}]$
+                    \item ${\cal{X}}_4 = \bot^\#_{\Intmn}$
+                \end{itemize}
+
+
+                \onslide<7>
+                Iteration: 7
+
+                Queue: [2]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = x \in [0, +\inf]$
+                    \item ${\cal{X}}_3 = x \in [0, 39]$
+                    \item ${\cal{X}}_4 = \alert{x \in [40, +\inf]}$
+                \end{itemize}
+
+
+                \onslide<8>
+                Iteration: 8
+
+                Queue: []
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\nabla$] ${\cal{X}}_2 = x \in [0, +\inf]$
+                    \item ${\cal{X}}_3 = x \in [0, 39]$
+                    \item ${\cal{X}}_4 = x \in [40, +\inf]$
+                \end{itemize}
+                Fix point
+
+
+            \end{overprint}
+
+        \end{column}
+    \end{columns}
+
+\end{frame}
+
+\begin{frame}{Example with Narrowing}
+
+    \begin{columns}[T]
+        \begin{column}{0.4\textwidth}
+            \begin{tikzpicture}
+                \begin{scope}[every node/.style={circle, draw}]
+                    \node (1) at (2, 4.5) {1};
+                    \node (2) at (2, 2) {2};
+                    \node (3) at (0, 0) {3};
+                    \node (4) at (3.5, 0) {4};
+                \end{scope}
+
+                \begin{scope}[>={Stealth[black]},
+                    every node/.style={fill=white}
+                    ]
+                    \path [->] (1) edge node{\texttt{x := 0}} (2);
+                    \path [->] (2) edge[bend right=45] node{\texttt{x < 40}} (3);
+                    \path [->] (2) edge node{\texttt{x $\geq$ 40}} (4);
+                    \path [->] (3) edge[bend right=45] node{\texttt{x := x+1}} (2);
+                \end{scope}
+            \end{tikzpicture}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+
+            \begin{overprint}
+                \onslide<1>
+                Iteration: 8 + 0
+
+                Queue: [2] $\leftarrow$ narrowing points
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\Delta$] ${\cal{X}}_2 = x \in [0, +\inf]$
+                    \item ${\cal{X}}_3 = x \in [0, 39]$
+                    \item ${\cal{X}}_4 = x \in [40, +\inf]$
+                \end{itemize}
+
+                The narrowing begins from the previously found fix point
+
+                \onslide<2>
+                Iteration: 8 + 1
+
+                Queue: [3, 4]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\Delta$] ${\cal{X}}_2 = x \in [0, \alert{40}]$
+                    \item ${\cal{X}}_3 = x \in [0, 39]$
+                    \item ${\cal{X}}_4 = x \in [40, +\inf]$
+                \end{itemize}
+
+                \onslide<3>
+                Iteration: 8 + 2
+
+                Queue: [4]
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\Delta$] ${\cal{X}}_2 = x \in [0, 40]$
+                    \item ${\cal{X}}_3 = x \in [0, 39]$
+                    \item ${\cal{X}}_4 = x \in [40, +\inf]$
+                \end{itemize}
+
+                \onslide<4>
+                Iteration: 8 + 3
+
+                Queue: []
+
+                \begin{itemize}
+                    \item ${\cal{X}}_1 = \top^\#_{\Intmn}$
+                    \item[$\Delta$] ${\cal{X}}_2 = x \in [0, 40]$
+                    \item ${\cal{X}}_3 = x \in [0, 39]$
+                    \item ${\cal{X}}_4 = x \in [40, \alert{40}]$
+                \end{itemize}
+                Fix point
+
+                Most precise invariant
+
+
+            \end{overprint}
+
+        \end{column}
+    \end{columns}
 
 \end{frame}
 
