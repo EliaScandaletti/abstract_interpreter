@@ -52,7 +52,10 @@ where
         }
     }
 
-    fn execute(&self, graph: ControlFlowGraph) -> AIResult<AVD, AD> {
+    fn execute(&self, graph: ControlFlowGraph) -> AIResult<AVD, AD>
+    where
+        <AD as AbsDomain<AVD>>::State: std::fmt::Display,
+    {
         let labels = graph.labels();
         let wid_pts = graph.wid_pts();
         let entry_point = graph.entry_point();
@@ -101,8 +104,7 @@ where
                     self.domain().lub(&s, &ns)
                 });
             let new = if wid_pts.contains(n) {
-                new
-                // self.domain().widening(old, new) // TODO
+                self.domain().widening(old, &new)
             } else {
                 new
             };

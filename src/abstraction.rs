@@ -38,10 +38,10 @@ where
 
     fn bot(&self) -> Self::State;
     fn top(&self) -> Self::State;
-    fn lub(&self, rhs: &Self::State, lhs: &Self::State) -> Self::State;
-    fn glb(&self, rhs: &Self::State, lhs: &Self::State) -> Self::State;
-    // fn widening(rhs: &Self::State, lhs: &Self::State) -> Self::State;
-    // fn narrowing(rhs: &Self::State, lhs: &Self::State) -> Self::State;
+    fn lub(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
+    fn glb(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
+    fn widening(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
+    fn narrowing(&self, lhs: &Self::State, rhs: &Self::State) -> Self::State;
     // fn gamma<T>(val: &Self::State) -> T;
     // fn alpha<T>(val: T) -> Self::State;
 }
