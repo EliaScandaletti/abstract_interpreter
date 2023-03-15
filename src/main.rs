@@ -59,15 +59,15 @@ where
     AD::State: Display,
 {
     let AIResult { inv, exit_point } = inv;
-    let last_inv = inv.get(exit_point).unwrap();
 
-    fn get_inv<S>(stm: &Stm, inv: &BTreeMap<Label, S>) -> (Label, bool, S)
+    fn pretty_inv<S>(id: &Label, w: bool, inv: &BTreeMap<Label, S>) -> String
     where
         S: Clone + Display,
     {
-        let id = stm.id();
-        let w = stm.is_widen();
-        (*id, w, inv.get(id).unwrap().clone())
+        let s = inv.get(id).unwrap().clone();
+        format!("{id}{}: {s}", if w { "w" } else { " " })
+            .purple()
+            .to_string()
     }
 
     fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Label, S>, i: usize) -> String
@@ -76,8 +76,7 @@ where
     {
         let x = "";
         let ii = i + 4;
-        let (id, w, s) = get_inv(stm, inv);
-        let ss = format!("{id}{}: {s}", if w { "w" } else { " " }).purple();
+        let ss = pretty_inv(stm.id(), stm.is_widen(), inv);
         match stm {
             Stm::AExp(_, _, aexp) => format!("{ss}\n{x:i$}{aexp}"),
             Stm::BExp(_, _, bexp) => format!("{ss}\n{x:i$}{bexp}"),
@@ -108,8 +107,5 @@ where
 
     let i = 8;
     let body = print_nice(prog, inv, i);
-    format!(
-        "{body}\n{}",
-        format!("{exit_point} : {last_inv}").purple().purple()
-    )
+    format!("{body}\n{}", pretty_inv(exit_point, false, inv))
 }
