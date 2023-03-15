@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Display, fs};
+use std::{collections::BTreeMap, fmt::Display, fs, process::ExitCode};
 
 use abstraction::{AbsDomain, AbsValueDomain};
 use colored::Colorize;
@@ -24,32 +24,41 @@ mod control_flow_graph;
 pub mod interpreter;
 pub mod syntax;
 
-fn main() {
+fn main() -> ExitCode {
     let input = fs::read_to_string("src/test.while").unwrap();
     println!("Paring input:\n{}", input);
 
-    let prog = build_ast(&input);
-    println!("\nParsed input:\n{}", prog);
+    match build_ast(&input) {
+        Ok(prog) => {
+            println!("\nParsed input:\n{}", prog);
 
-    let graph = ControlFlowGraph::new(&prog);
-    let vars = prog.get_vars();
-    let nums = prog.get_numerals();
+            let graph = ControlFlowGraph::new(&prog);
+            let vars = prog.get_vars();
+            let nums = prog.get_numerals();
 
-    let dlb = match nums.first() {
-        Some(n) => Limit::Num(n.clone() - 1),
-        None => Limit::InfN,
-    };
-    let dub = match nums.last() {
-        Some(n) => Limit::Num(n.clone() + 1),
-        None => Limit::InfP,
-    };
-    let v_dom = IntervalValueDomain::new(dlb, dub);
-    let dom = IntervalDomain::new(v_dom, &vars);
+            let dlb = match nums.first() {
+                Some(n) => Limit::Num(n.clone() - 1),
+                None => Limit::InfN,
+            };
+            let dub = match nums.last() {
+                Some(n) => Limit::Num(n.clone() + 1),
+                None => Limit::InfP,
+            };
+            let v_dom = IntervalValueDomain::new(dlb, dub);
+            let dom = IntervalDomain::new(v_dom, &vars);
 
-    let ai = IntervalInterpreter::new(dom);
-    let inv = ai.execute(graph);
-    println!("\n{:-<30}", "Output:".blue());
-    println!("{}", pretty_result(&prog, &inv))
+            let ai = IntervalInterpreter::new(dom);
+            let inv = ai.execute(graph);
+            println!("\n{:-<30}", "Output:".blue());
+            println!("{}", pretty_result(&prog, &inv));
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            println!("Syntax error at line {}", e.line());
+            println!("{e}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn pretty_result<AVD, AD>(prog: &Stm, inv: &AIResult<AVD, AD>) -> String

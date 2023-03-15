@@ -40,7 +40,7 @@ stm = { spre* ~ sval ~ (sinfix ~ spre* ~ sval)* }
     whiledo =  { "while" ~ bexp ~ "do" ~ stm ~ "done" }
   sinfix = _{ comp }
     comp = { ";" }
-  spre = _{ "#" ~ (wid | nar)+ }
+  spre = _{ "#" ~ (wid | nar)+ ~ "#"}
     wid = { "w" }
     nar = { "n" }
   

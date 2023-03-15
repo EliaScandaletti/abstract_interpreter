@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, fmt::Display};
 
-use pest::{iterators::Pairs, pratt_parser::PrattParser, Parser};
+use pest::{error::Error, iterators::Pairs, pratt_parser::PrattParser, Parser};
 
 #[derive(Parser)]
 #[grammar = "syntax/while.pest"]
@@ -427,10 +427,15 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
         .parse(pairs)
 }
 
-pub fn build_ast(input: &str) -> Stm {
-    let mut progr_pair = WParser::parse(Rule::program, input).expect("Syntax error: ");
-    let pairs = progr_pair.next().unwrap().into_inner();
-    stm_ast(pairs)
+pub fn build_ast(input: &str) -> Result<Stm, Error<Rule>> {
+    let parse_result = WParser::parse(Rule::program, input);
+    match parse_result {
+        Ok(mut pairs) => {
+            let pairs = pairs.next().unwrap().into_inner();
+            Ok(stm_ast(pairs))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 impl Display for AExp {
