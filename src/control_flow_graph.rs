@@ -15,6 +15,7 @@ pub enum Command {
 pub struct ControlFlowGraph {
     labels: BTreeSet<Label>,
     wid_pts: BTreeSet<Label>,
+    nar_pts: BTreeSet<Label>,
     entry_point: Label,
     exit_point: Label,
     arcs: BTreeMap<(Label, Label), Command>,
@@ -27,6 +28,10 @@ impl ControlFlowGraph {
 
     pub fn wid_pts(&self) -> &BTreeSet<Label> {
         &self.wid_pts
+    }
+
+    pub fn nar_pts(&self) -> &BTreeSet<Label> {
+        &self.nar_pts
     }
 
     pub fn entry_point(&self) -> &Label {
@@ -43,11 +48,47 @@ impl ControlFlowGraph {
 
     pub fn new(ast: &Stm) -> Self {
         match ast {
-            Stm::AExp(Meta { id, widening, .. }, _)
-            | Stm::BExp(Meta { id, widening, .. }, _)
-            | Stm::Ass(Meta { id, widening, .. }, _, _)
-            | Stm::Skip(Meta { id, widening, .. }) => {
+            Stm::AExp(
+                Meta {
+                    id,
+                    widening,
+                    narrowing,
+                    ..
+                },
+                _,
+            )
+            | Stm::BExp(
+                Meta {
+                    id,
+                    widening,
+                    narrowing,
+                    ..
+                },
+                _,
+            )
+            | Stm::Ass(
+                Meta {
+                    id,
+                    widening,
+                    narrowing,
+                    ..
+                },
+                _,
+                _,
+            )
+            | Stm::Skip(Meta {
+                id,
+                widening,
+                narrowing,
+                ..
+            }) => {
                 let wid_pts = if *widening {
+                    [*id].into()
+                } else {
+                    BTreeSet::new()
+                };
+
+                let nar_pts = if *narrowing {
                     [*id].into()
                 } else {
                     BTreeSet::new()
@@ -70,13 +111,24 @@ impl ControlFlowGraph {
                 Self {
                     labels,
                     wid_pts,
+                    nar_pts,
                     entry_point,
                     exit_point,
                     arcs,
                 }
             }
 
-            Stm::IfThenElse(Meta { id, widening, .. }, g, stm1, stm2) => {
+            Stm::IfThenElse(
+                Meta {
+                    id,
+                    widening,
+                    narrowing,
+                    ..
+                },
+                g,
+                stm1,
+                stm2,
+            ) => {
                 let g1 = Self::new(&stm1);
                 let g2 = Self::new(&stm2);
 
@@ -84,6 +136,12 @@ impl ControlFlowGraph {
                     .into_iter()
                     .chain(g1.wid_pts.into_iter())
                     .chain(g2.wid_pts.into_iter())
+                    .collect();
+
+                let nar_pts = if *narrowing { vec![*id] } else { vec![] }
+                    .into_iter()
+                    .chain(g1.nar_pts.into_iter())
+                    .chain(g2.nar_pts.into_iter())
                     .collect();
 
                 let entry_point = *id;
@@ -111,13 +169,23 @@ impl ControlFlowGraph {
                 Self {
                     labels,
                     wid_pts,
+                    nar_pts,
                     entry_point,
                     exit_point,
                     arcs,
                 }
             }
 
-            Stm::While(Meta { id, widening, .. }, g, stm) => {
+            Stm::While(
+                Meta {
+                    id,
+                    widening,
+                    narrowing,
+                    ..
+                },
+                g,
+                stm,
+            ) => {
                 let gr = Self::new(&stm);
 
                 let entry_point = *id;
@@ -131,6 +199,11 @@ impl ControlFlowGraph {
                 let wid_pts = if *widening { vec![*id] } else { vec![] }
                     .into_iter()
                     .chain(gr.wid_pts.into_iter())
+                    .collect();
+
+                let nar_pts = if *narrowing { vec![*id] } else { vec![] }
+                    .into_iter()
+                    .chain(gr.nar_pts.into_iter())
                     .collect();
 
                 let gu = Command::Guard(g.clone());
@@ -149,6 +222,7 @@ impl ControlFlowGraph {
                 Self {
                     labels,
                     wid_pts,
+                    nar_pts,
                     entry_point,
                     exit_point,
                     arcs,
@@ -170,6 +244,12 @@ impl ControlFlowGraph {
                     .chain(g2.wid_pts.into_iter())
                     .collect();
 
+                let nar_pts = g1
+                    .nar_pts
+                    .into_iter()
+                    .chain(g2.nar_pts.into_iter())
+                    .collect();
+
                 let arcs = g1
                     .arcs
                     .into_iter()
@@ -185,6 +265,7 @@ impl ControlFlowGraph {
                 Self {
                     labels,
                     wid_pts,
+                    nar_pts,
                     entry_point,
                     exit_point,
                     arcs,
