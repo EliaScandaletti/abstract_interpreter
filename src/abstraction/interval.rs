@@ -153,7 +153,7 @@ impl AbsValueDomain for IntervalValueDomain {
     type Value = Interval;
 
     fn value_from_num(&self, num: &Numeral) -> Self::Value {
-        self.from_couple(Limit::Num(num.clone()), Limit::Num(num.clone()))
+        self.from_couple(Limit::Num(*num), Limit::Num(*num))
     }
 
     fn cmp(&self, lhs: &Self::Value, rhs: &Self::Value) -> bool {

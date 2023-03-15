@@ -129,8 +129,8 @@ impl ControlFlowGraph {
                 stm1,
                 stm2,
             ) => {
-                let g1 = Self::new(&stm1);
-                let g2 = Self::new(&stm2);
+                let g1 = Self::new(stm1);
+                let g2 = Self::new(stm2);
 
                 let wid_pts = if *widening { vec![*id] } else { vec![] }
                     .into_iter()
@@ -186,7 +186,7 @@ impl ControlFlowGraph {
                 g,
                 stm,
             ) => {
-                let gr = Self::new(&stm);
+                let gr = Self::new(stm);
 
                 let entry_point = *id;
                 let exit_point = gr.exit_point;
@@ -230,8 +230,8 @@ impl ControlFlowGraph {
             }
 
             Stm::Comp(stm1, stm2) => {
-                let g1 = Self::new(&stm1);
-                let g2 = Self::new(&stm2);
+                let g1 = Self::new(stm1);
+                let g2 = Self::new(stm2);
 
                 let entry_point = g1.entry_point;
                 let exit_point = g2.exit_point;

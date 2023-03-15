@@ -101,7 +101,7 @@ impl AExp {
         match self {
             AExp::Num(n) => {
                 let mut ret = BTreeSet::new();
-                ret.insert(n.clone());
+                ret.insert(*n);
                 ret
             }
             AExp::Var(_)
@@ -428,7 +428,7 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
         .parse(pairs)
 }
 
-pub fn build_ast(input: &str, path: &str) -> Result<Stm, Error<Rule>> {
+pub fn build_ast(input: &str, path: &str) -> Result<Stm, Box<Error<Rule>>> {
     let parse_result = WParser::parse(Rule::program, input);
     match parse_result {
         Ok(mut pairs) => {
@@ -437,7 +437,7 @@ pub fn build_ast(input: &str, path: &str) -> Result<Stm, Error<Rule>> {
         }
         Err(e) => {
             let e = e.with_path(path);
-            Err(e)
+            Err(e.into())
         }
     }
 }
@@ -492,12 +492,12 @@ fn fmt(stm: &Stm, i: usize) -> String {
         Stm::IfThenElse(_, g, stm1, stm2) => {
             format!(
                 "{wi:i$}if {g} then\n{}\n{ei:i$}else\n{}\n{ei:i$}endif",
-                fmt(&stm1, ii),
-                fmt(&stm2, ii)
+                fmt(stm1, ii),
+                fmt(stm2, ii)
             )
         }
-        Stm::While(_, g, stm) => format!("{wi:i$}while {g} do\n{}\n{ei:i$}done", fmt(&stm, ii)),
-        Stm::Comp(stm1, stm2) => format!("{};\n{}", fmt(&stm1, i), fmt(&stm2, i)),
+        Stm::While(_, g, stm) => format!("{wi:i$}while {g} do\n{}\n{ei:i$}done", fmt(stm, ii)),
+        Stm::Comp(stm1, stm2) => format!("{};\n{}", fmt(stm1, i), fmt(stm2, i)),
     }
 }
 

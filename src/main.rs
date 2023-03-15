@@ -50,11 +50,11 @@ fn main() -> ExitCode {
             let nums = prog.get_numerals();
 
             let dlb = match nums.first() {
-                Some(n) => Limit::Num(n.clone() - 1),
+                Some(n) => Limit::Num(n - 1),
                 None => Limit::InfN,
             };
             let dub = match nums.last() {
-                Some(n) => Limit::Num(n.clone() + 1),
+                Some(n) => Limit::Num(n + 1),
                 None => Limit::InfP,
             };
             let v_dom = IntervalValueDomain::new(dlb, dub);
@@ -111,21 +111,21 @@ where
             Stm::IfThenElse(_, g, stm1, stm2) => {
                 format!(
                     "{ss}\n{x:i$}if {g} then\n{}\n{x:i$}else\n{}\n{x:i$}endif",
-                    print_nice(&stm1, inv, ii),
-                    print_nice(&stm2, inv, ii),
+                    print_nice(stm1, inv, ii),
+                    print_nice(stm2, inv, ii),
                 )
             }
             Stm::While(_, g, stm) => {
                 format!(
                     "{ss}\n{x:i$}while {g} do\n{}\n{x:i$}done",
-                    print_nice(&stm, inv, ii),
+                    print_nice(stm, inv, ii),
                 )
             }
             Stm::Comp(stm1, stm2) => {
                 format!(
                     "{};\n{}",
-                    print_nice(&stm1, inv, i),
-                    print_nice(&stm2, inv, i)
+                    print_nice(stm1, inv, i),
+                    print_nice(stm2, inv, i)
                 )
             }
         }

@@ -435,8 +435,7 @@ impl AbstractInterpreter<IntervalValueDomain, IntervalDomain> for IntervalInterp
             And(bexp1, bexp2) => {
                 let mut tt1 = self.bexp(state, bexp1);
                 self.bexp(state, bexp2);
-                let tt2 = self.bexp(&mut tt1, bexp2);
-                tt2
+                self.bexp(&mut tt1, bexp2)
             }
             Or(bexp1, bexp2) => {
                 let tt1 = self.bexp(state, bexp1);
@@ -475,7 +474,7 @@ impl AbstractInterpreter<IntervalValueDomain, IntervalDomain> for IntervalInterp
                 Or(b1, b2) => {
                     self.bexp(state, &And(Not(b1.clone()).into(), Not(b2.clone()).into()))
                 }
-                Not(e) => self.bexp(state, &e),
+                Not(e) => self.bexp(state, e),
             },
         }
     }

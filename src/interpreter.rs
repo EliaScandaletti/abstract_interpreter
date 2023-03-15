@@ -35,11 +35,11 @@ where
     fn evaluate(&self, mut state: AD::State, comm: &Command) -> AD::State {
         match comm {
             Command::AExp(aexp) => {
-                self.aexp(&mut state, &aexp);
+                self.aexp(&mut state, aexp);
                 state
             }
             Command::BExp(bexp) => {
-                self.bexp(&mut state, &bexp);
+                self.bexp(&mut state, bexp);
                 state
             }
             Command::Ass(var, aexp) => {
@@ -88,14 +88,14 @@ where
 
         let mut invariants: BTreeMap<_, _> =
             labels.iter().map(|l| (*l, self.domain().bot())).collect();
-        *invariants.get_mut(&entry_point).unwrap() = self.domain().top();
+        *invariants.get_mut(entry_point).unwrap() = self.domain().top();
 
         let mut queue: VecDeque<_> = labels.iter().filter(|&l| l != entry_point).collect();
 
         while let Some(n) = queue.pop_front() {
-            let old = invariants.get(&n).unwrap();
+            let old = invariants.get(n).unwrap();
             let new = bwd_dep
-                .get(&n)
+                .get(n)
                 .unwrap()
                 .iter()
                 .fold(self.domain().bot(), |s, p| {
@@ -111,13 +111,10 @@ where
             };
 
             if *old != new {
-                invariants.insert(n.clone(), new);
-                match fwd_dep.get(&n) {
-                    Some(vs) => {
-                        let tail: Vec<_> = vs.iter().filter(|n| !queue.contains(n)).collect();
-                        queue.extend(tail)
-                    }
-                    None => (),
+                invariants.insert(*n, new);
+                if let Some(vs) = fwd_dep.get(n) {
+                    let tail: Vec<_> = vs.iter().filter(|n| !queue.contains(n)).collect();
+                    queue.extend(tail)
                 }
             }
         }
@@ -125,9 +122,9 @@ where
         queue.extend(nar_pts.iter().filter(|&l| l != entry_point));
 
         while let Some(n) = queue.pop_front() {
-            let old = invariants.get(&n).unwrap();
+            let old = invariants.get(n).unwrap();
             let new = bwd_dep
-                .get(&n)
+                .get(n)
                 .unwrap()
                 .iter()
                 .fold(self.domain().bot(), |s, p| {
@@ -143,13 +140,10 @@ where
             };
 
             if *old != new {
-                invariants.insert(n.clone(), new);
-                match fwd_dep.get(&n) {
-                    Some(vs) => {
-                        let tail: Vec<_> = vs.iter().filter(|n| !queue.contains(n)).collect();
-                        queue.extend(tail)
-                    }
-                    None => (),
+                invariants.insert(*n, new);
+                if let Some(vs) = fwd_dep.get(n) {
+                    let tail: Vec<_> = vs.iter().filter(|n| !queue.contains(n)).collect();
+                    queue.extend(tail)
                 }
             }
         }
