@@ -60,14 +60,18 @@ where
 {
     let AIResult { inv, exit_point } = inv;
 
-    fn pretty_inv<S>(id: &Label, w: bool, inv: &BTreeMap<Label, S>) -> String
+    fn pretty_inv<S>(id: &Label, w: bool, n: bool, inv: &BTreeMap<Label, S>) -> String
     where
         S: Clone + Display,
     {
         let s = inv.get(id).unwrap().clone();
-        format!("{id}{}: {s}", if w { "w" } else { " " })
-            .purple()
-            .to_string()
+        format!(
+            "{id}{}{}: {s}",
+            if w { "w" } else { " " },
+            if n { "n" } else { " " }
+        )
+        .purple()
+        .to_string()
     }
 
     fn print_nice<S>(stm: &Stm, inv: &BTreeMap<Label, S>, i: usize) -> String
@@ -76,7 +80,7 @@ where
     {
         let x = "";
         let ii = i + 4;
-        let ss = pretty_inv(stm.id(), stm.widening(), inv);
+        let ss = pretty_inv(stm.id(), stm.widening(), stm.narrowing(), inv);
         match stm {
             Stm::AExp(_, aexp) => format!("{ss}\n{x:i$}{aexp}"),
             Stm::BExp(_, bexp) => format!("{ss}\n{x:i$}{bexp}"),
@@ -107,5 +111,5 @@ where
 
     let i = 8;
     let body = print_nice(prog, inv, i);
-    format!("{body}\n{}", pretty_inv(exit_point, false, inv))
+    format!("{body}\n{}", pretty_inv(exit_point, false, false, inv))
 }

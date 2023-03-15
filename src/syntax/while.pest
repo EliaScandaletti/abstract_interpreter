@@ -32,7 +32,7 @@ bexp = { bpre* ~ bval ~ (binfix ~ bpre* ~ bval )* }
   bpre = _{ not }
     not = { "!" }
 
-stm = { spre? ~ sval ~ (sinfix ~ spre? ~ sval)* }
+stm = { spre* ~ sval ~ (sinfix ~ spre* ~ sval)* }
   sval = _{ skip | ifelse | whiledo | ass | bexp | aexp}
     skip =  { "skip" }
     ass =  { var ~ ":=" ~ aexp }
@@ -40,8 +40,9 @@ stm = { spre? ~ sval ~ (sinfix ~ spre? ~ sval)* }
     whiledo =  { "while" ~ bexp ~ "do" ~ stm ~ "done" }
   sinfix = _{ comp }
     comp = { ";" }
-  spre = _{ wid }
-    wid = { "#" ~ "w" }
+  spre = _{ "#" ~ (wid | nar)+ }
+    wid = { "w" }
+    nar = { "n" }
   
 program = _{SOI ~ stm ~ EOI}
 

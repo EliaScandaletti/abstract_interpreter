@@ -41,6 +41,7 @@ lazy_static::lazy_static! {
         PrattParser::new()
         .op(Op::infix(comp, Left))
         .op(Op::prefix(wid))
+        .op(Op::prefix(nar))
     };
 }
 
@@ -208,6 +209,10 @@ impl Stm {
 
     pub fn widening(&self) -> bool {
         self.meta().widening
+    }
+
+    pub(crate) fn narrowing(&self) -> bool {
+        self.meta().narrowing
     }
 
     pub fn get_vars(&self) -> BTreeSet<Variable> {
@@ -400,8 +405,22 @@ fn stm_ast(pairs: Pairs<Rule>) -> Stm {
                     Stm::Comp(s1, s2) => Stm::Comp(make_wid(*s1).into(), s2),
                 }
             }
+            fn make_nar(stm: Stm) -> Stm {
+                let mut meta = stm.meta().clone();
+                meta.narrowing = true;
+                match stm {
+                    Stm::AExp(_, e) => Stm::AExp(meta, e),
+                    Stm::BExp(_, e) => Stm::BExp(meta, e),
+                    Stm::Ass(_, x, e) => Stm::Ass(meta, x, e),
+                    Stm::Skip(_) => Stm::Skip(meta),
+                    Stm::IfThenElse(_, g, e1, e2) => Stm::IfThenElse(meta, g, e1, e2),
+                    Stm::While(_, g, e) => Stm::While(meta, g, e),
+                    Stm::Comp(s1, s2) => Stm::Comp(make_wid(*s1).into(), s2),
+                }
+            }
             match op.as_rule() {
                 Rule::wid => make_wid(rhs),
+                Rule::nar => make_nar(rhs),
                 _ => unreachable!(),
             }
         })
