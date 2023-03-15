@@ -39,11 +39,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    println!("Parsing input:\n{}", input);
+    println!("{:-<30}", "Input:".blue());
+    println!("{}", input);
 
     match build_ast(&input, file) {
         Ok(prog) => {
-            println!("\nParsed input:\n{}", prog);
+            println!("\n{:-<30}", "Parsed input:".blue());
+            println!("{}", prog);
 
             let graph = ControlFlowGraph::new(&prog);
             let vars = prog.get_vars();
