@@ -1,0 +1,5 @@
+x := 0;
+[wn]
+while x < 40 do
+    x := x + 1
+done
