@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, fmt::Display};
 
+use colored::Colorize;
 use pest::{error::Error, iterators::Pairs, pratt_parser::PrattParser, Parser};
 
 #[derive(Parser)]
@@ -461,9 +462,9 @@ impl Display for BExp {
         match self {
             BExp::True => write!(f, "true"),
             BExp::False => write!(f, "false"),
-            BExp::Eq(aexp1, aexp2) => write!(f, "({aexp1} = {aexp2})"),
-            BExp::Neq(aexp1, aexp2) => write!(f, "({aexp1} != {aexp2})"),
-            BExp::Lt(aexp1, aexp2) => write!(f, "({aexp1} < {aexp2})"),
+            BExp::Eq(aexp1, aexp2) => write!(f, "{aexp1} = {aexp2}"),
+            BExp::Neq(aexp1, aexp2) => write!(f, "{aexp1} != {aexp2}"),
+            BExp::Lt(aexp1, aexp2) => write!(f, "{aexp1} < {aexp2}"),
             BExp::And(bexp1, bexp2) => write!(f, "({bexp1} && {bexp2})"),
             BExp::Or(bexp1, bexp2) => write!(f, "({bexp1} || {bexp2})"),
             BExp::Not(bexp) => write!(f, "!({bexp})"),
@@ -472,7 +473,12 @@ impl Display for BExp {
 }
 
 fn fmt(stm: &Stm, i: usize) -> String {
-    let x = "";
+    let x = format!(
+        "[{}{}]",
+        if stm.meta().widening { "w" } else { " " },
+        if stm.meta().narrowing { "n" } else { " " }
+    )
+    .purple();
     let ii = i + 4;
     match stm {
         Stm::AExp(_, aexp) => format!("{x:i$}{aexp}"),
@@ -493,6 +499,6 @@ fn fmt(stm: &Stm, i: usize) -> String {
 
 impl Display for Stm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", fmt(self, 0))
+        write!(f, "{}", fmt(self, 5))
     }
 }
