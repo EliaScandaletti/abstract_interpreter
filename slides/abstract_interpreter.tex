@@ -389,10 +389,10 @@
         \item \texttt{BExp(meta, \textit{b})} $\sim$ \textit{b}, result is ignored;
         \item \texttt{Ass(meta, \textit{x}, \textit{a})} $\sim$ \texttt{\textit{x} := \textit{a}};
         \item \texttt{Skip(meta)} $\sim$ \sskip;
-        \item \texttt{IfThenElse(meta, \textit{b}, $stm_1$, $stm_2$)} $\sim$ \\
-              \hskip 1.5cm $\ifelse{\textit{b}}{stm_1}{stm_2}$;
-        \item \texttt{While(meta, \textit{b}, $stm$)} $\sim$ \texttt{while \textit{b} do $stm$ done};
-        \item \texttt{Comp($stm_1$, $stm_2$)} $\sim$ \texttt{$stm_1$; \textit{stm}2}.
+        \item \texttt{IfThenElse(meta, \textit{b}, \textit{stm1}, \textit{stm2})} $\sim$ \\
+              \hskip 1.5cm \texttt{if \textit{b} then \textit{stm1} else \textit{stm2} endif};
+        \item \texttt{While(meta, \textit{b}, \textit{stm})} $\sim$ \texttt{while \textit{b} do \textit{stm} done};
+        \item \texttt{Comp(\textit{stm1}, \textit{stm2})} $\sim$ \texttt{\textit{stm1}; \textit{stm}2}.
     \end{itemize}
 
     ~\\
@@ -411,7 +411,7 @@
 
     \begin{itemize}
         \item \texttt{Guard(\textit{b})}: represents the states for which \textit{b} evaluated to true;
-        \item \texttt{AExp(a)}, \texttt{BExp(b)}, \texttt{Ass(x, a)}, \texttt{Skip}: represent how the corresponding statements modify the state.
+        \item \texttt{AExp(\textit{a})}, \texttt{BExp(\textit{b})}, \texttt{Ass(\textit{x}, \textit{a})}, \texttt{Skip}: represent how the corresponding statements modify the state.
     \end{itemize}
 
     ~\\
